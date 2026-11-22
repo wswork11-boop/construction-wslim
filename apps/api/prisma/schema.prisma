@@ -1,0 +1,906 @@
+// All specs (01 foundation, 02 quotations, 03 daily reports, 04 invoicing,
+// 06 MyInvois). See docs/02-data-model.md.
+// NOTE: written before Node.js was installed; run `prisma validate` and adjust
+// the generator/datasource blocks to the installed Prisma version.
+//
+// Rules that Prisma cannot express and must be added as raw SQL in a migration
+// (or enforced in the service layer):
+//   - only one DRAFT progress claim per project (partial unique index on Invoice)
+//   - EInvoiceSubmission has exactly one of invoiceId / creditNoteId (CHECK)
+//   - ClaimLine.cumulativePercent between 0 and 100 (CHECK)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  OWNER
+  OFFICE
+  PROJECT_MANAGER
+  SITE_STAFF
+}
+
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CLOSED
+}
+
+enum FileStatus {
+  PENDING
+  READY
+}
+
+enum QuotationStatus {
+  DRAFT
+  SENT
+  ACCEPTED
+  REJECTED
+  SUPERSEDED
+  EXPIRED
+}
+
+enum VariationStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+enum InvoiceType {
+  SIMPLE
+  PROGRESS_CLAIM
+  RETENTION_RELEASE
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  VOID
+}
+
+enum DailyReportStatus {
+  SUBMITTED
+  REVIEWED
+}
+
+enum Weather {
+  SUNNY
+  CLOUDY
+  RAIN
+  HEAVY_RAIN
+}
+
+enum EInvoiceStatus {
+  NOT_REQUIRED
+  PENDING
+  SUBMITTED
+  VALID
+  INVALID
+  CANCELLED
+}
+
+enum ExpenseCategory {
+  MATERIALS
+  SUBCONTRACTOR
+  TOOLS_EQUIPMENT
+  LABOUR
+  TRANSPORT
+  SITE_PETTY_CASH
+  OFFICE_OVERHEAD
+  OTHER
+}
+
+enum ExpenseStatus {
+  UNPAID
+  PAID
+  REIMBURSED
+  VOID
+}
+
+// ---------------------------------------------------------------------------
+// Spec 01 - Foundation
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  email        String   @unique
+  passwordHash String
+  name         String
+  phone        String?
+  role         Role
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  refreshTokens RefreshToken[]
+  memberships   ProjectMember[]
+  files         File[]
+  auditLogs     AuditLog[]
+
+  quotationsCreated      Quotation[]
+  contractItemsCreated   ContractItem[]
+  variationOrdersCreated VariationOrder[]
+  invoicesCreated        Invoice[]
+  creditNotesCreated     CreditNote[]
+  paymentsCreated          Payment[]
+  dailyReportsSubmitted    DailyReport[]      @relation("DailyReportSubmittedBy")
+  dailyReportsReviewed     DailyReport[]      @relation("DailyReportReviewedBy")
+  progressReportsCreated   ProgressReport[]
+  inspectionReportsCreated InspectionReport[]
+  expensesCreated          Expense[]
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid(7)) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique
+  deviceName String?
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// Failed logins, used for the 5-in-15-minutes lockout (AC1).
+model LoginAttempt {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  email     String
+  success   Boolean
+  ip        String?
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+}
+
+// Single row. `singleton` is always true and unique, so a second row cannot exist.
+model Company {
+  id                         String   @id @default(uuid(7)) @db.Uuid
+  singleton                  Boolean  @unique @default(true)
+  name                       String
+  registrationNo             String?
+  tin                        String?
+  sstNo                      String?
+  msicCode                   String?
+  address                    String?
+  phone                      String?
+  email                      String?
+  logoFileId                 String?  @db.Uuid
+  bankDetails                String?
+  defaultPaymentTermDays     Int      @default(30)
+  defaultRetentionPercent    Decimal  @default(10) @db.Decimal(5, 2)
+  defaultRetentionCapPercent Decimal  @default(5) @db.Decimal(5, 2)
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
+
+model TaxRate {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  name      String   @unique
+  percent   Decimal  @db.Decimal(5, 2)
+  isDefault Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  quotationItems QuotationItem[]
+  expenses       Expense[]
+}
+
+model DocumentSequence {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  docType    String
+  year       Int
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  @@unique([docType, year])
+}
+
+model Client {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  code           String?
+  name           String
+  registrationNo String?
+  tin            String?
+  sstNo          String?
+  address        String?
+  contactName    String?
+  phone          String?
+  email          String?  @unique
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  projects   Project[]
+  quotations Quotation[]
+  invoices   Invoice[]
+  payments   Payment[]
+
+  @@index([name])
+}
+
+model Project {
+  id                     String        @id @default(uuid(7)) @db.Uuid
+  code                   String        @unique
+  name                   String
+  clientId               String        @db.Uuid
+  contractQuotationId    String?       @db.Uuid
+  contractQuoteRef       String?
+  poNumber               String?
+  siteAddress            String?
+  status                 ProjectStatus @default(DRAFT)
+  startDate              DateTime?     @db.Date
+  endDate                DateTime?     @db.Date
+  contractSum            Decimal       @default(0) @db.Decimal(14, 2)
+  retentionPercent       Decimal       @default(10) @db.Decimal(5, 2)
+  retentionCapPercent    Decimal       @default(5) @db.Decimal(5, 2)
+  defectsLiabilityMonths Int           @default(12)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  client  Client          @relation(fields: [clientId], references: [id])
+  members ProjectMember[]
+
+  quotations        Quotation[]
+  contractItems     ContractItem[]
+  variationOrders   VariationOrder[]
+  invoices          Invoice[]
+  dailyReports      DailyReport[]
+  progressReports   ProgressReport[]
+  inspectionReports InspectionReport[]
+  expenses          Expense[]
+
+  @@index([clientId])
+  @@index([status])
+}
+
+model ProjectMember {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  projectId String   @db.Uuid
+  userId    String   @db.Uuid
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+model File {
+  id           String     @id @default(uuid(7)) @db.Uuid
+  bucketKey    String     @unique
+  fileName     String
+  mimeType     String
+  size         Int
+  purpose      String
+  status       FileStatus @default(PENDING)
+  uploadedById String     @db.Uuid
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  quotationPdfs     Quotation[]
+  invoicePdfs       Invoice[]
+  creditNotePdfs    CreditNote[]
+  dailyReportPhotos DailyReportPhoto[]
+  expenseReceipts   Expense[]
+
+  @@index([uploadedById])
+}
+
+model AuditLog {
+  id       String   @id @default(uuid(7)) @db.Uuid
+  userId   String?  @db.Uuid
+  entity   String
+  entityId String
+  action   String
+  before   Json?
+  after    Json?
+  at       DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([at])
+}
+
+// ---------------------------------------------------------------------------
+// Spec 02 - Quotations
+// ---------------------------------------------------------------------------
+
+// Revisions share `number` and `rootId`; `revisionNo` increases (0 = original).
+// `rootId` is the id of the first revision. It is deliberately NOT a foreign
+// key: the first revision points at itself, which would need the id to be known
+// before insert and would block deleting a revision-0 draft.
+model Quotation {
+  id              String          @id @default(uuid(7)) @db.Uuid
+  number          String
+  rootId          String          @db.Uuid
+  revisionNo      Int             @default(0)
+  clientId        String          @db.Uuid
+  projectId       String?         @db.Uuid
+  title           String
+  status          QuotationStatus @default(DRAFT)
+  issueDate       DateTime        @db.Date
+  validUntil      DateTime?       @db.Date
+  terms           String?
+  notes           String?
+  rejectionReason String?
+  subtotal        Decimal         @default(0) @db.Decimal(14, 2)
+  discountAmount  Decimal         @default(0) @db.Decimal(14, 2)
+  taxAmount       Decimal         @default(0) @db.Decimal(14, 2)
+  total           Decimal         @default(0) @db.Decimal(14, 2)
+  pdfFileId       String?         @db.Uuid
+  createdById     String          @db.Uuid
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  client    Client   @relation(fields: [clientId], references: [id])
+  project   Project? @relation(fields: [projectId], references: [id])
+  pdfFile   File?    @relation(fields: [pdfFileId], references: [id])
+  createdBy User     @relation(fields: [createdById], references: [id])
+
+  sections QuotationSection[]
+  items    QuotationItem[]
+
+  @@unique([number, revisionNo])
+  @@unique([rootId, revisionNo])
+  @@index([clientId])
+  @@index([projectId])
+  @@index([status, issueDate])
+  @@index([pdfFileId])
+  @@index([createdById])
+}
+
+model QuotationSection {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  quotationId String   @db.Uuid
+  sortOrder   Int      @default(0)
+  title       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  quotation Quotation       @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  items     QuotationItem[]
+
+  @@index([quotationId, sortOrder])
+}
+
+model QuotationItem {
+  id          String   @id @default(uuid(7)) @db.Uuid
+  quotationId String   @db.Uuid
+  sectionId   String   @db.Uuid
+  sortOrder   Int      @default(0)
+  description String
+  unit        String?
+  quantity    Decimal  @db.Decimal(14, 3)
+  rate        Decimal  @db.Decimal(14, 2)
+  amount      Decimal  @db.Decimal(14, 2)
+  taxRateId   String?  @db.Uuid
+  // Snapshot of TaxRate.percent at the time the item was saved.
+  taxPercent  Decimal  @default(0) @db.Decimal(5, 2)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  quotation Quotation        @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  section   QuotationSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  taxRate   TaxRate?         @relation(fields: [taxRateId], references: [id])
+
+  contractItems ContractItem[]
+
+  @@index([quotationId])
+  @@index([sectionId, sortOrder])
+  @@index([taxRateId])
+}
+
+// ---------------------------------------------------------------------------
+// Spec 04 - Contract and variations
+// ---------------------------------------------------------------------------
+
+// Copied from the accepted quotation (sourceQuotationItemId set) or appended
+// when a variation order is approved (variationOrderId set). Quantity and
+// amount can be negative for omissions.
+model ContractItem {
+  id                    String   @id @default(uuid(7)) @db.Uuid
+  projectId             String   @db.Uuid
+  sourceQuotationItemId String?  @db.Uuid
+  variationOrderId      String?  @db.Uuid
+  sectionTitle          String?
+  sortOrder             Int      @default(0)
+  description           String
+  unit                  String?
+  quantity              Decimal  @db.Decimal(14, 3)
+  rate                  Decimal  @db.Decimal(14, 2)
+  amount                Decimal  @db.Decimal(14, 2)
+  taxPercent            Decimal  @default(0) @db.Decimal(5, 2)
+  createdById           String   @db.Uuid
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  project             Project         @relation(fields: [projectId], references: [id])
+  sourceQuotationItem QuotationItem?  @relation(fields: [sourceQuotationItemId], references: [id])
+  variationOrder      VariationOrder? @relation(fields: [variationOrderId], references: [id])
+  createdBy           User            @relation(fields: [createdById], references: [id])
+
+  claimLines           ClaimLine[]
+  dailyReportProgress  DailyReportProgress[]
+  progressReportLines  ProgressReportLine[]
+
+  @@index([projectId, sortOrder])
+  @@index([sourceQuotationItemId])
+  @@index([variationOrderId])
+  @@index([createdById])
+}
+
+model VariationOrder {
+  id          String          @id @default(uuid(7)) @db.Uuid
+  number      String          @unique
+  shortRef    String?
+  projectId   String          @db.Uuid
+  title       String
+  reason      String?
+  status      VariationStatus @default(DRAFT)
+  approvedAt  DateTime?
+  // Can be negative for omissions.
+  total       Decimal         @default(0) @db.Decimal(14, 2)
+  createdById String          @db.Uuid
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  items         VariationOrderItem[]
+  contractItems ContractItem[]
+
+  @@index([projectId, status])
+  @@index([createdById])
+}
+
+model VariationOrderItem {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  variationOrderId String   @db.Uuid
+  sortOrder        Int      @default(0)
+  description      String
+  unit             String?
+  quantity         Decimal  @db.Decimal(14, 3)
+  rate             Decimal  @db.Decimal(14, 2)
+  amount           Decimal  @db.Decimal(14, 2)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  variationOrder VariationOrder @relation(fields: [variationOrderId], references: [id], onDelete: Cascade)
+
+  @@index([variationOrderId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Spec 04 - Invoicing, progress claims and payments
+// ---------------------------------------------------------------------------
+
+// `number`, `issueDate` and `dueDate` are null while DRAFT and set on issue
+// (spec 04 AC6). The claim fields are only set for PROGRESS_CLAIM invoices.
+// Buyer/supplier fields are a snapshot taken at issue (spec 04 AC11).
+model Invoice {
+  id                   String         @id @default(uuid(7)) @db.Uuid
+  number               String?        @unique
+  type                 InvoiceType
+  projectId            String?        @db.Uuid
+  clientId             String         @db.Uuid
+  status               InvoiceStatus  @default(DRAFT)
+  issueDate            DateTime?      @db.Date
+  dueDate              DateTime?      @db.Date
+  claimNo              Int?
+  progressReportId     String?        @db.Uuid
+  projectCodeRef       String?
+  quotePoRef           String?
+  claimReportRef       String?
+  referenceSummary     String?
+  periodFrom           DateTime?      @db.Date
+  periodTo             DateTime?      @db.Date
+  grossToDate          Decimal?       @db.Decimal(14, 2)
+  retentionToDate      Decimal?       @db.Decimal(14, 2)
+  previousNetCertified Decimal?       @db.Decimal(14, 2)
+  // Tax rate applied to the claim / release subtotal. Null for SIMPLE (per line).
+  taxPercent           Decimal?       @db.Decimal(5, 2)
+  subtotal             Decimal        @default(0) @db.Decimal(14, 2)
+  taxAmount            Decimal        @default(0) @db.Decimal(14, 2)
+  total                Decimal        @default(0) @db.Decimal(14, 2)
+  amountPaid           Decimal        @default(0) @db.Decimal(14, 2)
+  notes                String?
+  pdfFileId            String?        @db.Uuid
+  voidedAt             DateTime?
+  voidReason           String?
+
+  buyerName              String?
+  buyerRegistrationNo    String?
+  buyerTin               String?
+  buyerSstNo             String?
+  buyerAddress           String?
+  supplierName           String?
+  supplierRegistrationNo String?
+  supplierTin            String?
+  supplierSstNo          String?
+  supplierMsicCode       String?
+  supplierAddress        String?
+
+  eInvoiceStatus      EInvoiceStatus @default(NOT_REQUIRED)
+  eInvoiceUuid        String?
+  eInvoiceLongId      String?
+  eInvoiceValidatedAt DateTime?
+
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project        Project?        @relation(fields: [projectId], references: [id])
+  client         Client          @relation(fields: [clientId], references: [id])
+  pdfFile        File?           @relation(fields: [pdfFileId], references: [id])
+  createdBy      User            @relation(fields: [createdById], references: [id])
+  progressReport ProgressReport? @relation(fields: [progressReportId], references: [id])
+
+  lines               InvoiceLine[]
+  claimLines          ClaimLine[]
+  creditNotes         CreditNote[]
+  allocations         PaymentAllocation[]
+  eInvoiceSubmissions EInvoiceSubmission[]
+
+  // Claim numbers are consecutive per project (spec 04 AC5). Null claimNo
+  // (non-claim invoices) does not collide in PostgreSQL.
+  @@unique([projectId, claimNo])
+  @@index([status, issueDate])
+  @@index([projectId])
+  @@index([clientId])
+  @@index([type])
+  @@index([pdfFileId])
+  @@index([createdById])
+}
+
+model InvoiceLine {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  invoiceId          String   @db.Uuid
+  sortOrder          Int      @default(0)
+  description        String
+  unit               String?
+  quantity           Decimal  @db.Decimal(14, 3)
+  rate               Decimal  @db.Decimal(14, 2)
+  amount             Decimal  @db.Decimal(14, 2)
+  taxPercent         Decimal  @default(0) @db.Decimal(5, 2)
+  taxAmount          Decimal  @default(0) @db.Decimal(14, 2)
+  classificationCode String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId, sortOrder])
+}
+
+// One row per contract item on a progress claim. All figures are cumulative
+// except `thisClaimAmount` (= cumulativeAmount - previousAmount).
+model ClaimLine {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  invoiceId          String   @db.Uuid
+  contractItemId     String   @db.Uuid
+  cumulativePercent  Decimal  @default(0) @db.Decimal(5, 2)
+  cumulativeQuantity Decimal  @default(0) @db.Decimal(14, 3)
+  cumulativeAmount   Decimal  @default(0) @db.Decimal(14, 2)
+  previousAmount     Decimal  @default(0) @db.Decimal(14, 2)
+  thisClaimAmount    Decimal  @default(0) @db.Decimal(14, 2)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  invoice      Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  contractItem ContractItem @relation(fields: [contractItemId], references: [id])
+
+  @@unique([invoiceId, contractItemId])
+  @@index([contractItemId])
+}
+
+model CreditNote {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  number    String   @unique
+  invoiceId String   @db.Uuid
+  issueDate DateTime @db.Date
+  reason    String
+  subtotal  Decimal  @db.Decimal(14, 2)
+  taxAmount Decimal  @default(0) @db.Decimal(14, 2)
+  total     Decimal  @db.Decimal(14, 2)
+  pdfFileId String?  @db.Uuid
+
+  eInvoiceStatus      EInvoiceStatus @default(NOT_REQUIRED)
+  eInvoiceUuid        String?
+  eInvoiceLongId      String?
+  eInvoiceValidatedAt DateTime?
+
+  createdById String   @db.Uuid
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+  pdfFile   File?   @relation(fields: [pdfFileId], references: [id])
+  createdBy User    @relation(fields: [createdById], references: [id])
+
+  eInvoiceSubmissions EInvoiceSubmission[]
+
+  @@index([invoiceId])
+  @@index([issueDate])
+  @@index([pdfFileId])
+  @@index([createdById])
+}
+
+model Payment {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  clientId     String   @db.Uuid
+  receivedDate DateTime @db.Date
+  // Free text for now (e.g. BANK_TRANSFER, CHEQUE, CASH); no enum in the data model.
+  method       String
+  reference    String?
+  amount       Decimal  @db.Decimal(14, 2)
+  notes        String?
+  createdById  String   @db.Uuid
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  client    Client @relation(fields: [clientId], references: [id])
+  createdBy User   @relation(fields: [createdById], references: [id])
+
+  allocations PaymentAllocation[]
+
+  @@index([clientId])
+  @@index([receivedDate])
+  @@index([createdById])
+}
+
+model PaymentAllocation {
+  id        String   @id @default(uuid(7)) @db.Uuid
+  paymentId String   @db.Uuid
+  invoiceId String   @db.Uuid
+  amount    Decimal  @db.Decimal(14, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@unique([paymentId, invoiceId])
+  @@index([invoiceId])
+}
+
+// ---------------------------------------------------------------------------
+// Spec 03 - Daily site reports
+// ---------------------------------------------------------------------------
+
+// `id` has no default: the phone generates it so that a retried PUT is
+// idempotent (spec 03 AC3). The unique constraint is AC4 and also serves as
+// the (projectId, reportDate) index asked for by spec 05.
+model DailyReport {
+  id              String            @id @db.Uuid
+  number          String?
+  projectId       String            @db.Uuid
+  reportDate      DateTime          @db.Date
+  submittedById   String            @db.Uuid
+  weather         Weather?
+  workDone        String
+  issues          String?
+  nextDayPlan     String?
+  status          DailyReportStatus @default(SUBMITTED)
+  reviewedById    String?           @db.Uuid
+  reviewedAt      DateTime?
+  latitude        Decimal?          @db.Decimal(9, 6)
+  longitude       Decimal?          @db.Decimal(9, 6)
+  deviceCreatedAt DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id])
+  submittedBy User    @relation("DailyReportSubmittedBy", fields: [submittedById], references: [id])
+  reviewedBy  User?   @relation("DailyReportReviewedBy", fields: [reviewedById], references: [id])
+
+  manpower DailyReportManpower[]
+  photos   DailyReportPhoto[]
+  progress DailyReportProgress[]
+
+  @@unique([projectId, reportDate, submittedById])
+  @@index([submittedById, reportDate])
+  @@index([reviewedById])
+  @@index([status])
+}
+
+model DailyReportManpower {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  dailyReportId String   @db.Uuid
+  trade         String
+  headcount     Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+
+  @@unique([dailyReportId, trade])
+}
+
+model DailyReportPhoto {
+  id            String    @id @default(uuid(7)) @db.Uuid
+  dailyReportId String    @db.Uuid
+  fileId        String    @db.Uuid
+  caption       String?
+  takenAt       DateTime?
+  sortOrder     Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  dailyReport DailyReport @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  file        File        @relation(fields: [fileId], references: [id])
+
+  @@unique([dailyReportId, fileId])
+  @@index([dailyReportId, sortOrder])
+  @@index([fileId])
+}
+
+// Optional. Site estimate, used as a hint when preparing progress claims.
+model DailyReportProgress {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  dailyReportId   String   @db.Uuid
+  contractItemId  String   @db.Uuid
+  percentComplete Decimal  @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  dailyReport  DailyReport  @relation(fields: [dailyReportId], references: [id], onDelete: Cascade)
+  contractItem ContractItem @relation(fields: [contractItemId], references: [id])
+
+  @@unique([dailyReportId, contractItemId])
+  @@index([contractItemId])
+}
+
+model ProgressReport {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  number         String   @unique
+  projectId      String   @db.Uuid
+  reportDate     DateTime @db.Date
+  periodFrom     DateTime? @db.Date
+  periodTo       DateTime? @db.Date
+  summary        String?
+  overallPercent Decimal  @default(0) @db.Decimal(5, 2)
+  createdById    String   @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project   Project              @relation(fields: [projectId], references: [id])
+  createdBy User                 @relation(fields: [createdById], references: [id])
+  lines     ProgressReportLine[]
+  invoices  Invoice[]
+
+  @@index([projectId, reportDate])
+}
+
+model ProgressReportLine {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  progressReportId  String   @db.Uuid
+  contractItemId    String   @db.Uuid
+  cumulativePercent Decimal  @default(0) @db.Decimal(5, 2)
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  progressReport ProgressReport @relation(fields: [progressReportId], references: [id], onDelete: Cascade)
+  contractItem   ContractItem   @relation(fields: [contractItemId], references: [id])
+
+  @@unique([progressReportId, contractItemId])
+}
+
+model InspectionReport {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  number         String   @unique
+  projectId      String   @db.Uuid
+  inspectionDate DateTime @db.Date
+  title          String
+  findings       String?
+  status         String   @default("PASSED")
+  inspectorId    String   @db.Uuid
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id])
+  inspector User    @relation(fields: [inspectorId], references: [id])
+
+  @@index([projectId, inspectionDate])
+}
+
+// ---------------------------------------------------------------------------
+// Spec 06 - MyInvois (spec is still DRAFT; expect this table to change)
+// ---------------------------------------------------------------------------
+
+// One row per submission attempt series for an invoice OR a credit note
+// (exactly one of the two ids is set; enforce with a CHECK constraint).
+// Payloads are stored with secrets removed (spec 06 AC7).
+model EInvoiceSubmission {
+  id              String         @id @default(uuid(7)) @db.Uuid
+  invoiceId       String?        @db.Uuid
+  creditNoteId    String?        @db.Uuid
+  submissionUid   String?
+  documentUuid    String?
+  status          EInvoiceStatus @default(PENDING)
+  requestPayload  Json?
+  responsePayload Json?
+  errors          Json?
+  attempts        Int            @default(0)
+  submittedAt     DateTime?
+  validatedAt     DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  invoice    Invoice?    @relation(fields: [invoiceId], references: [id])
+  creditNote CreditNote? @relation(fields: [creditNoteId], references: [id])
+
+  @@index([invoiceId])
+  @@index([creditNoteId])
+  @@index([status])
+  @@index([submissionUid])
+  @@index([documentUuid])
+}
+
+// ---------------------------------------------------------------------------
+// Spec 07 - Project & Company Expenses (Job Costing)
+// ---------------------------------------------------------------------------
+
+model Expense {
+  id               String          @id @default(uuid(7)) @db.Uuid
+  number           String          @unique
+  projectId        String?         @db.Uuid
+  projectCodeRef   String?
+  category         ExpenseCategory
+  status           ExpenseStatus   @default(UNPAID)
+  expenseDate      DateTime        @db.Date
+  vendorName       String
+  billReference    String?
+  description      String
+  subtotal         Decimal         @default(0) @db.Decimal(14, 2)
+  taxRateId        String?         @db.Uuid
+  taxPercent       Decimal         @default(0) @db.Decimal(5, 2)
+  taxAmount        Decimal         @default(0) @db.Decimal(14, 2)
+  total            Decimal         @default(0) @db.Decimal(14, 2)
+  paidDate         DateTime?       @db.Date
+  paymentMethod    String?
+  paymentReference String?
+  receiptFileId    String?         @db.Uuid
+  notes            String?
+  voidedAt         DateTime?
+  voidReason       String?
+  createdById      String          @db.Uuid
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  project     Project? @relation(fields: [projectId], references: [id])
+  taxRate     TaxRate? @relation(fields: [taxRateId], references: [id])
+  receiptFile File?    @relation(fields: [receiptFileId], references: [id])
+  createdBy   User     @relation(fields: [createdById], references: [id])
+
+  @@index([projectId, expenseDate])
+  @@index([status, expenseDate])
+  @@index([category])
+  @@index([createdById])
+}
+
+

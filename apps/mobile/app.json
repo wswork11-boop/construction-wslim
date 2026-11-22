@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Construction Site Reports",
+    "slug": "construction-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"],
+    "ios": {
+      "bundleIdentifier": "my.com.contohbina.sitereports",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Take site progress photos for daily reports.",
+        "NSPhotoLibraryUsageDescription": "Attach site progress photos from your gallery.",
+        "NSLocationWhenInUseUsageDescription": "Record on-site GPS location with your daily report."
+      }
+    },
+    "android": {
+      "package": "my.com.contohbina.sitereports",
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    }
+  }
+}

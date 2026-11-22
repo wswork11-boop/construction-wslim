@@ -32,4 +32,11 @@ React + Vite (web), Expo React Native (mobile), Zod schemas in `packages/shared`
 
 ## Commands
 
-To be filled in when the monorepo is scaffolded (spec 01, T01).
+- `pnpm build` - build all packages and applications
+- `pnpm dev` - start API and web dev servers
+- `pnpm lint` - run ESLint across all workspaces
+- `pnpm typecheck` - run TypeScript type checking across all workspaces
+- `pnpm test` - run all unit and e2e tests
+- `pnpm --filter @construction/api prisma:validate` - validate Prisma schema
+- `pnpm --filter @construction/api prisma:migrate` - run database migrations
+- `pnpm --filter @construction/api prisma:seed` - seed initial OWNER user, company and tax rates

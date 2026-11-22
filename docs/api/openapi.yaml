@@ -1,0 +1,4727 @@
+openapi: 3.1.0
+info:
+  title: Construction System API
+  version: 1.0.0
+  description: |
+    REST API for a Malaysian construction business: quotations, invoices and progress
+    claims, daily site reports from the mobile app, and reports.
+
+    Conventions (see docs/01-architecture.md):
+
+    - Base path is `/api/v1`.
+    - All ids are UUID v7. The mobile app generates the id of a daily report.
+    - Money is sent as a decimal string with 2 places (`"1234.50"`), quantities as a
+      decimal string with up to 3 places, percentages as a decimal string with up to 2 places.
+      Currency is always MYR.
+    - Business dates (`issueDate`, `reportDate`, ...) are `date` values interpreted as
+      Asia/Kuala_Lumpur. Timestamps are UTC `date-time`.
+    - Errors use `{ statusCode, code, message, details? }` where `code` is a stable string.
+    - Lists accept `page`, `pageSize`, `sort`, `q` and return `{ items, total, page, pageSize }`.
+    - Fields marked `readOnly` are calculated by the server. If a client sends them they are ignored.
+    - Price fields are stripped from responses for SITE_STAFF by the serializer.
+
+    Vendor extensions:
+
+    - `x-roles` lists the roles allowed to call an operation. An empty array means the
+      operation is public. PROJECT_MANAGER and SITE_STAFF are additionally limited to
+      projects they are a member of; OWNER and OFFICE always pass the membership check.
+    - `x-error-codes` maps the stable error `code` values an operation can return to the
+      HTTP status and the reason.
+
+    Error codes common to all operations and not repeated per operation:
+    `UNAUTHENTICATED` (401), `FORBIDDEN` (403), `NOT_PROJECT_MEMBER` (403),
+    `NOT_FOUND` (404), `VALIDATION_ERROR` (422).
+servers:
+  - url: /api/v1
+    description: Same origin, versioned base path
+security:
+  - bearerAuth: []
+tags:
+  - name: Auth
+    description: Login, token refresh, logout, password change
+  - name: Users
+    description: User administration (OWNER)
+  - name: Company
+    description: Company settings and tax rates
+  - name: Clients
+    description: Client master data
+  - name: Projects
+    description: Projects, members and the project contract
+  - name: Files
+    description: Presigned upload and download
+  - name: Quotations
+    description: Quotations with sections, items, revisions and PDF
+  - name: DailyReports
+    description: Daily site reports from the mobile app
+  - name: VariationOrders
+    description: Variation orders (additions and omissions)
+  - name: Invoices
+    description: Simple invoices, progress claims, retention releases, credit notes
+  - name: Payments
+    description: Payments received and their allocation to invoices
+  - name: Reports
+    description: Dashboard and reports
+
+paths:
+  # ---------------------------------------------------------------- Auth
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Log in with email and password
+      security: []
+      x-roles: []
+      x-error-codes:
+        INVALID_CREDENTIALS: 401 - wrong email or password, or the user is deactivated
+        LOGIN_LOCKED: 429 - 5 failures in 15 minutes, attempts for this email are locked for 15 minutes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Access token (15 minutes), refresh token and the current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Exchange a refresh token for a new token pair
+      description: The refresh token is rotated. The old refresh token is invalid after this call.
+      security: []
+      x-roles: []
+      x-error-codes:
+        INVALID_REFRESH_TOKEN: 401 - token unknown, expired, revoked, already used, or the user is deactivated
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoke the refresh token of this device
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogoutRequest'
+      responses:
+        '204':
+          description: Logged out. Also returned when the token was already revoked.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentUser
+      summary: Get the logged-in user
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      responses:
+        '200':
+          description: The current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Change own password
+      description: All other refresh tokens of the user are revoked.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      x-error-codes:
+        CURRENT_PASSWORD_INCORRECT: 422 - currentPassword does not match
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: Password changed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ---------------------------------------------------------------- Users
+  /users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List users
+      x-roles: [OWNER]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: role
+          in: query
+          schema:
+            $ref: '#/components/schemas/Role'
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Page of users
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Users]
+      operationId: createUser
+      summary: Create a user and assign a role
+      x-roles: [OWNER]
+      x-error-codes:
+        USER_EMAIL_TAKEN: 409 - another user already has this email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserCreate'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Users]
+      operationId: getUser
+      summary: Get a user
+      x-roles: [OWNER]
+      responses:
+        '200':
+          description: The user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Users]
+      operationId: updateUser
+      summary: Update or deactivate a user
+      description: Setting `isActive` to false revokes all refresh tokens of the user. Users are never deleted.
+      x-roles: [OWNER]
+      x-error-codes:
+        USER_EMAIL_TAKEN: 409 - another user already has this email
+        CANNOT_DEACTIVATE_SELF: 409 - an OWNER cannot deactivate or demote their own account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdate'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ---------------------------------------------------------------- Company
+  /company:
+    get:
+      tags: [Company]
+      operationId: getCompany
+      summary: Get company settings
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      responses:
+        '200':
+          description: The single company row
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [Company]
+      operationId: updateCompany
+      summary: Update company settings
+      x-roles: [OWNER]
+      x-error-codes:
+        FILE_NOT_UPLOADED: 422 - logoFileId does not reference an uploaded file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompanyUpdate'
+      responses:
+        '200':
+          description: Updated company settings
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Company'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /tax-rates:
+    get:
+      tags: [Company]
+      operationId: listTaxRates
+      summary: List tax rates
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Page of tax rates
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxRateList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Company]
+      operationId: createTaxRate
+      summary: Create a tax rate
+      description: Setting `isDefault` to true clears the flag on the previous default.
+      x-roles: [OWNER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxRateCreate'
+      responses:
+        '201':
+          description: Tax rate created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxRate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /tax-rates/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Company]
+      operationId: updateTaxRate
+      summary: Update or deactivate a tax rate
+      description: Documents keep their own snapshot of `taxPercent`, so changing a rate never alters existing documents.
+      x-roles: [OWNER]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TaxRateUpdate'
+      responses:
+        '200':
+          description: Updated tax rate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaxRate'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ---------------------------------------------------------------- Clients
+  /clients:
+    get:
+      tags: [Clients]
+      operationId: listClients
+      summary: List clients
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: isActive
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Page of clients
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Clients]
+      operationId: createClient
+      summary: Create a client
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        CLIENT_EMAIL_TAKEN: 409 - another client already has this email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientCreate'
+      responses:
+        '201':
+          description: Client created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /clients/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Clients]
+      operationId: getClient
+      summary: Get a client
+      x-roles: [OWNER, OFFICE]
+      responses:
+        '200':
+          description: The client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Clients]
+      operationId: updateClient
+      summary: Update or deactivate a client
+      description: Clients are deactivated with `isActive` false, never deleted.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        CLIENT_EMAIL_TAKEN: 409 - another client already has this email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClientUpdate'
+      responses:
+        '200':
+          description: Updated client
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Client'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ---------------------------------------------------------------- Projects
+  /projects:
+    get:
+      tags: [Projects]
+      operationId: listProjects
+      summary: List projects
+      description: >-
+        OWNER and OFFICE see all projects. PROJECT_MANAGER and SITE_STAFF receive only
+        projects they are a member of. For SITE_STAFF the price field `contractSum` is absent.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/ProjectStatus'
+        - $ref: '#/components/parameters/ClientIdQuery'
+      responses:
+        '200':
+          description: Page of projects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Projects]
+      operationId: createProject
+      summary: Create a project for a client
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        PROJECT_CODE_TAKEN: 409 - another project already has this code
+        CLIENT_NOT_FOUND: 422 - clientId does not exist or the client is inactive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /projects/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Projects]
+      operationId: getProject
+      summary: Get a project with its members
+      description: PROJECT_MANAGER and SITE_STAFF must be members. For SITE_STAFF the price field `contractSum` is absent.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      responses:
+        '200':
+          description: The project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Projects]
+      operationId: updateProject
+      summary: Update a project
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        PROJECT_CODE_TAKEN: 409 - another project already has this code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdate'
+      responses:
+        '200':
+          description: Updated project
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Project'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /projects/{id}/members:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Projects]
+      operationId: replaceProjectMembers
+      summary: Replace the full member list of a project
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        USER_NOT_ASSIGNABLE: 422 - a userId does not exist or the user is inactive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectMembersInput'
+      responses:
+        '200':
+          description: The new member list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectMemberList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /projects/{id}/contract/from-quotation:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Projects]
+      operationId: createContractFromQuotation
+      summary: Convert an accepted quotation into the project contract
+      description: >-
+        Copies the quotation items to contract items and sets `Project.contractSum`.
+        Can be done once per project.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        CONTRACT_ALREADY_EXISTS: 409 - the project already has a contract
+        QUOTATION_NOT_ACCEPTED: 409 - the quotation is not in status ACCEPTED
+        QUOTATION_CLIENT_MISMATCH: 422 - the quotation belongs to another client or another project
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractFromQuotationInput'
+      responses:
+        '201':
+          description: The contract
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /projects/{id}/contract:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Projects]
+      operationId: getProjectContract
+      summary: Get the project contract
+      description: Items, original sum, approved variation orders, current sum, claimed to date and retention held.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        CONTRACT_NOT_FOUND: 404 - the project has no contract yet
+      responses:
+        '200':
+          description: The contract
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------- Files
+  /files/presign:
+    post:
+      tags: [Files]
+      operationId: presignFileUpload
+      summary: Get a presigned PUT URL for a direct upload to the bucket
+      description: >-
+        Creates a `File` row with status PENDING. Upload the bytes with HTTP PUT to `uploadUrl`,
+        then reference `fileId` when saving the parent record. The API verifies the object exists
+        and marks the file READY at that point.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      x-error-codes:
+        FILE_TYPE_NOT_ALLOWED: 422 - mimeType is not allowed for this purpose
+        FILE_TOO_LARGE: 422 - size is above the limit for this purpose
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PresignRequest'
+      responses:
+        '201':
+          description: Presigned upload URL and the file id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PresignResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /files/{id}/url:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Files]
+      operationId: getFileUrl
+      summary: Get a short-lived presigned download URL
+      description: Allowed for any user who has access to the record the file is attached to.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      x-error-codes:
+        FILE_NOT_READY: 409 - the file is still PENDING (not uploaded or not yet attached)
+      responses:
+        '200':
+          description: Presigned download URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUrl'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ---------------------------------------------------------------- Quotations
+  /quotations:
+    get:
+      tags: [Quotations]
+      operationId: listQuotations
+      summary: List quotations
+      description: >-
+        Returns the latest revision of each quotation unless `latestOnly` is false.
+        PROJECT_MANAGER sees only quotations linked to own projects.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/QuotationStatus'
+        - $ref: '#/components/parameters/ClientIdQuery'
+        - $ref: '#/components/parameters/ProjectIdQuery'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: latestOnly
+          in: query
+          description: When true (default) only the latest revision of each quotation is returned.
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Page of quotations (header fields only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotationList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Quotations]
+      operationId: createQuotation
+      summary: Create a DRAFT quotation
+      description: The quotation number is assigned now and never changes across revisions.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        CLIENT_NOT_FOUND: 422 - clientId does not exist or the client is inactive
+        TAX_RATE_NOT_FOUND: 422 - a taxRateId does not exist or is inactive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotationInput'
+      responses:
+        '201':
+          description: Quotation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /quotations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Quotations]
+      operationId: getQuotation
+      summary: Get a quotation with sections and items
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      responses:
+        '200':
+          description: The quotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Quotations]
+      operationId: replaceQuotation
+      summary: Replace the header, sections and items of a DRAFT quotation
+      description: >-
+        Takes the full nested document and replaces it in one transaction. Sections and items
+        not present in the body are removed. Order is taken from array position. The server
+        recalculates all amounts and totals and ignores any sent by the client.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        QUOTATION_NOT_EDITABLE: 409 - only DRAFT quotations can be edited
+        CLIENT_NOT_FOUND: 422 - clientId does not exist or the client is inactive
+        TAX_RATE_NOT_FOUND: 422 - a taxRateId does not exist or is inactive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotationInput'
+      responses:
+        '200':
+          description: Updated quotation with recalculated totals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Quotations]
+      operationId: deleteQuotation
+      summary: Delete a DRAFT quotation that was never sent
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        QUOTATION_NOT_DELETABLE: 409 - only a DRAFT with revisionNo 0 can be deleted
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /quotations/{id}/send:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Quotations]
+      operationId: sendQuotation
+      summary: Freeze a DRAFT quotation, generate and store its PDF
+      description: Status becomes SENT. The stored PDF of a SENT revision is never regenerated.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        QUOTATION_INVALID_STATUS: 409 - the quotation is not DRAFT
+        QUOTATION_HAS_NO_ITEMS: 422 - a quotation with no items cannot be sent
+      responses:
+        '200':
+          description: The sent quotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /quotations/{id}/accept:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Quotations]
+      operationId: acceptQuotation
+      summary: Mark a SENT quotation as accepted
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        QUOTATION_INVALID_STATUS: 409 - the quotation is not SENT (includes EXPIRED)
+        QUOTATION_NOT_LATEST_REVISION: 409 - only the latest revision can be accepted
+      responses:
+        '200':
+          description: The accepted quotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /quotations/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Quotations]
+      operationId: rejectQuotation
+      summary: Mark a SENT quotation as rejected
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        QUOTATION_INVALID_STATUS: 409 - the quotation is not SENT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuotationRejectRequest'
+      responses:
+        '200':
+          description: The rejected quotation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /quotations/{id}/revise:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Quotations]
+      operationId: reviseQuotation
+      summary: Create the next revision of a SENT or REJECTED quotation
+      description: >-
+        Creates a DRAFT copy with the same `number` and `rootId` and `revisionNo + 1`,
+        and marks the source SUPERSEDED.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        QUOTATION_INVALID_STATUS: 409 - only SENT or REJECTED quotations can be revised
+        QUOTATION_NOT_LATEST_REVISION: 409 - a newer revision already exists
+      responses:
+        '201':
+          description: The new DRAFT revision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /quotations/{id}/duplicate:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Quotations]
+      operationId: duplicateQuotation
+      summary: Copy a quotation into a new DRAFT with a new number
+      x-roles: [OWNER, OFFICE]
+      responses:
+        '201':
+          description: The new DRAFT quotation (revisionNo 0, new number and rootId)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quotation'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /quotations/{id}/revisions:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Quotations]
+      operationId: listQuotationRevisions
+      summary: List all revisions that share the same root
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+      responses:
+        '200':
+          description: Page of revisions, newest revision first by default
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotationList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /quotations/{id}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Quotations]
+      operationId: getQuotationPdf
+      summary: Get a presigned URL for the quotation PDF
+      description: A DRAFT renders a watermarked preview. Any other status returns the PDF stored when it was sent.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      responses:
+        '200':
+          description: Presigned download URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUrl'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------------------------------------------------------------- Daily reports
+  /daily-reports:
+    get:
+      tags: [DailyReports]
+      operationId: listDailyReports
+      summary: List daily reports
+      description: >-
+        OWNER and OFFICE see all reports. PROJECT_MANAGER and SITE_STAFF see reports of
+        projects they are a member of. Items include manpower and photos so the mobile app
+        can cache them for offline reading.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/ProjectIdQuery'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: submittedById
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/DailyReportStatus'
+      responses:
+        '200':
+          description: Page of daily reports
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReportList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /daily-reports/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [DailyReports]
+      operationId: getDailyReport
+      summary: Get a daily report
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      responses:
+        '200':
+          description: The daily report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [DailyReports]
+      operationId: upsertDailyReport
+      summary: Create or update a daily report (idempotent)
+      description: >-
+        The id is generated on the phone. Takes the full nested document (manpower, photos,
+        optional progress) and replaces it. Repeating the call with the same id and body is safe
+        and results in one report. The caller must be a member of the project; an existing
+        report can only be updated by its author, until it is REVIEWED or 48 hours after the
+        report date, whichever comes first. `reportDate` can be today or up to 2 days back.
+        Photos are uploaded first through `POST /files/presign` and referenced by `fileId`.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+      x-error-codes:
+        NOT_PROJECT_MEMBER: 403 - the caller is not a member of the project
+        DAILY_REPORT_NOT_AUTHOR: 403 - the report exists and was submitted by another user
+        DAILY_REPORT_LOCKED: 409 - the report is REVIEWED or the 48 hour edit window has passed
+        DAILY_REPORT_ALREADY_EXISTS: 409 - the caller already has a report with another id for this project and date; details.existingId holds it
+        REPORT_DATE_OUT_OF_RANGE: 422 - reportDate is in the future or more than 2 days back
+        FILE_NOT_UPLOADED: 422 - a photo fileId does not reference an uploaded file
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DailyReportInput'
+      responses:
+        '200':
+          description: Existing report updated (or unchanged on a repeat)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReport'
+        '201':
+          description: Report created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /daily-reports/{id}/review:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [DailyReports]
+      operationId: reviewDailyReport
+      summary: Mark a daily report as reviewed
+      description: Sets status REVIEWED, `reviewedById` and `reviewedAt`. The report is locked for the author afterwards.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        DAILY_REPORT_ALREADY_REVIEWED: 409 - the report is already REVIEWED
+      responses:
+        '200':
+          description: The reviewed report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /projects/{id}/site-report.pdf:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [DailyReports]
+      operationId: getSiteReportPdf
+      summary: Download the daily or weekly site report PDF for a project
+      description: >-
+        Contains project details, date, weather, manpower table, work done, issues and a
+        photo grid with captions. Contains no prices. Use the same date for `from` and `to`
+        for a daily report.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        DATE_RANGE_TOO_LARGE: 422 - the range between from and to is more than 31 days
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: First report date to include (inclusive).
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Last report date to include (inclusive).
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: The PDF document
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ---------------------------------------------------------------- Variation orders
+  /projects/{id}/variation-orders:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [VariationOrders]
+      operationId: listVariationOrders
+      summary: List variation orders of a project
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/VariationStatus'
+      responses:
+        '200':
+          description: Page of variation orders (header fields only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariationOrderList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [VariationOrders]
+      operationId: createVariationOrder
+      summary: Create a DRAFT variation order
+      description: PROJECT_MANAGER may create variation orders on own projects only.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        CONTRACT_NOT_FOUND: 409 - the project has no contract yet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VariationOrderInput'
+      responses:
+        '201':
+          description: Variation order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariationOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /variation-orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [VariationOrders]
+      operationId: getVariationOrder
+      summary: Get a variation order with its items
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      responses:
+        '200':
+          description: The variation order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariationOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [VariationOrders]
+      operationId: replaceVariationOrder
+      summary: Replace the header and items of a DRAFT variation order
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        VARIATION_ORDER_NOT_EDITABLE: 409 - only DRAFT variation orders can be edited
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VariationOrderInput'
+      responses:
+        '200':
+          description: Updated variation order with recalculated total
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariationOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /variation-orders/{id}/submit:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [VariationOrders]
+      operationId: submitVariationOrder
+      summary: Submit a DRAFT variation order for approval
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        VARIATION_ORDER_INVALID_STATUS: 409 - the variation order is not DRAFT
+        VARIATION_ORDER_HAS_NO_ITEMS: 422 - a variation order with no items cannot be submitted
+      responses:
+        '200':
+          description: The submitted variation order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariationOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /variation-orders/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [VariationOrders]
+      operationId: approveVariationOrder
+      summary: Approve a SUBMITTED variation order
+      description: Appends contract items linked to this variation order and changes the current contract sum.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        VARIATION_ORDER_INVALID_STATUS: 409 - the variation order is not SUBMITTED
+      responses:
+        '200':
+          description: The approved variation order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariationOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /variation-orders/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [VariationOrders]
+      operationId: rejectVariationOrder
+      summary: Reject a SUBMITTED variation order
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        VARIATION_ORDER_INVALID_STATUS: 409 - the variation order is not SUBMITTED
+      responses:
+        '200':
+          description: The rejected variation order
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VariationOrder'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ---------------------------------------------------------------- Invoices
+  /invoices:
+    get:
+      tags: [Invoices]
+      operationId: listInvoices
+      summary: List invoices of all types
+      description: PROJECT_MANAGER sees only invoices of own projects.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - name: type
+          in: query
+          schema:
+            $ref: '#/components/schemas/InvoiceType'
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/InvoiceStatus'
+        - $ref: '#/components/parameters/ClientIdQuery'
+        - $ref: '#/components/parameters/ProjectIdQuery'
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - name: overdue
+          in: query
+          description: When true only ISSUED or PARTIALLY_PAID invoices past their dueDate are returned.
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Page of invoices (header fields only)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Invoices]
+      operationId: createInvoice
+      summary: Create a DRAFT simple invoice
+      description: >-
+        The body carries `type`. Only SIMPLE is accepted on this route. Progress claims are
+        created with `POST /projects/{id}/progress-claims` and retention releases with
+        `POST /projects/{id}/retention-releases`.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        INVOICE_TYPE_NOT_SUPPORTED: 422 - type is not SIMPLE
+        CLIENT_NOT_FOUND: 422 - clientId does not exist or the client is inactive
+        TAX_RATE_NOT_FOUND: 422 - a taxRateId does not exist or is inactive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SimpleInvoiceCreate'
+      responses:
+        '201':
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /invoices/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Invoices]
+      operationId: getInvoice
+      summary: Get an invoice with lines, claim lines and credit notes
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      responses:
+        '200':
+          description: The invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    put:
+      tags: [Invoices]
+      operationId: replaceInvoice
+      summary: Replace a DRAFT invoice
+      description: >-
+        The body shape depends on the type of the existing invoice: SIMPLE takes `lines`,
+        PROGRESS_CLAIM takes `claimLines`, RETENTION_RELEASE takes `amount`. The type cannot
+        be changed. The server recalculates every figure. PROJECT_MANAGER may only edit DRAFT
+        progress claims on own projects.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        INVOICE_NOT_EDITABLE: 409 - only DRAFT invoices can be edited
+        INVOICE_BODY_TYPE_MISMATCH: 422 - the body does not match the type of the invoice
+        CLAIM_PERCENT_BELOW_PREVIOUS: 422 - cumulativePercent of an item is lower than in the previous issued claim
+        CLAIM_PERCENT_ABOVE_100: 422 - cumulativePercent of an item is above 100
+        CLAIM_ITEM_NOT_IN_CONTRACT: 422 - a contractItemId does not belong to the project contract
+        RETENTION_RELEASE_EXCEEDS_HELD: 422 - total retention released would exceed retention held
+        TAX_RATE_NOT_FOUND: 422 - a taxRateId does not exist or is inactive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - $ref: '#/components/schemas/SimpleInvoiceUpdate'
+                - $ref: '#/components/schemas/ProgressClaimUpdate'
+                - $ref: '#/components/schemas/RetentionReleaseUpdate'
+      responses:
+        '200':
+          description: Updated invoice with recalculated figures
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+    delete:
+      tags: [Invoices]
+      operationId: deleteInvoice
+      summary: Delete a DRAFT invoice
+      description: Financial documents are never deleted once issued.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        INVOICE_NOT_EDITABLE: 409 - only DRAFT invoices can be deleted
+      responses:
+        '204':
+          description: Deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /projects/{id}/progress-claims:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Invoices]
+      operationId: createProgressClaim
+      summary: Create a DRAFT progress claim for a project
+      description: >-
+        Creates an invoice of type PROGRESS_CLAIM with one claim line per contract item,
+        pre-filled with the cumulative values of the previous issued claim. Only one DRAFT
+        progress claim per project at a time. Edit it with `PUT /invoices/{id}`.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        CONTRACT_NOT_FOUND: 409 - the project has no contract yet
+        DRAFT_CLAIM_EXISTS: 409 - the project already has a DRAFT progress claim; details.invoiceId holds it
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProgressClaimCreate'
+      responses:
+        '201':
+          description: The DRAFT progress claim
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /projects/{id}/retention-releases:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Invoices]
+      operationId: createRetentionRelease
+      summary: Create a DRAFT retention release invoice for a project
+      description: Bills part of the retention held. Total released on a project can never exceed retention held.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        CONTRACT_NOT_FOUND: 409 - the project has no contract yet
+        RETENTION_RELEASE_EXCEEDS_HELD: 422 - total retention released would exceed retention held
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RetentionReleaseCreate'
+      responses:
+        '201':
+          description: The DRAFT retention release invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /invoices/{id}/issue:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Invoices]
+      operationId: issueInvoice
+      summary: Issue a DRAFT invoice
+      description: >-
+        In one transaction: validates, assigns the number, snapshots totals, sets status ISSUED,
+        sets `dueDate = issueDate + payment term` and queues the PDF. `issueDate` defaults to
+        today when it is not set. The invoice is immutable afterwards.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        INVOICE_INVALID_STATUS: 409 - the invoice is not DRAFT
+        INVOICE_HAS_NO_LINES: 422 - a simple invoice with no lines cannot be issued
+        INVOICE_TOTAL_NOT_POSITIVE: 422 - the invoice total is zero or negative
+        CLAIM_PERCENT_BELOW_PREVIOUS: 422 - cumulativePercent of an item is lower than in the previous issued claim
+        RETENTION_RELEASE_EXCEEDS_HELD: 422 - total retention released would exceed retention held
+      responses:
+        '200':
+          description: The issued invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /invoices/{id}/void:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Invoices]
+      operationId: voidInvoice
+      summary: Void an ISSUED invoice
+      description: Allowed only if the invoice has no payments and no later claim depends on it.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        INVOICE_INVALID_STATUS: 409 - the invoice is not ISSUED
+        INVOICE_HAS_PAYMENTS: 409 - the invoice has payment allocations
+        INVOICE_HAS_DEPENDENT_CLAIM: 409 - a later progress claim on the project depends on this claim
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InvoiceVoidRequest'
+      responses:
+        '200':
+          description: The voided invoice
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /invoices/{id}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Invoices]
+      operationId: getInvoicePdf
+      summary: Get a presigned URL for the invoice PDF
+      description: A DRAFT renders a watermarked preview. An issued invoice returns the PDF stored when it was issued.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      x-error-codes:
+        PDF_NOT_READY: 409 - the PDF of the issued invoice is still being generated
+      responses:
+        '200':
+          description: Presigned download URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FileUrl'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+  /invoices/{id}/credit-notes:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Invoices]
+      operationId: createCreditNote
+      summary: Issue a credit note against an issued invoice
+      description: >-
+        The credit note is numbered and final as soon as it is created. The invoice
+        `amountPaid` and status are recomputed from allocations and credit notes.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        INVOICE_INVALID_STATUS: 409 - the invoice is DRAFT or VOID
+        CREDIT_NOTE_EXCEEDS_INVOICE: 422 - credit notes plus payment allocations would exceed the invoice total
+        TAX_RATE_NOT_FOUND: 422 - taxRateId does not exist or is inactive
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreditNoteCreate'
+      responses:
+        '201':
+          description: Credit note created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreditNote'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /exports/invoices.csv:
+    get:
+      tags: [Invoices]
+      operationId: exportInvoicesCsv
+      summary: Export invoices in a date range as CSV for the accountant
+      description: One row per invoice with status ISSUED, PARTIALLY_PAID, PAID or VOID, filtered by `issueDate`.
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: First issue date to include (inclusive).
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Last issue date to include (inclusive).
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ---------------------------------------------------------------- Payments
+  /payments:
+    get:
+      tags: [Payments]
+      operationId: listPayments
+      summary: List payments with their allocations
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/Sort'
+        - $ref: '#/components/parameters/Q'
+        - $ref: '#/components/parameters/ClientIdQuery'
+        - name: invoiceId
+          in: query
+          description: Only payments that have an allocation to this invoice.
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+      responses:
+        '200':
+          description: Page of payments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      tags: [Payments]
+      operationId: createPayment
+      summary: Record a payment and allocate it across invoices
+      description: Invoice `amountPaid` and status (PARTIALLY_PAID or PAID) are updated automatically.
+      x-roles: [OWNER, OFFICE]
+      x-error-codes:
+        INVOICE_NOT_PAYABLE: 409 - an allocated invoice is DRAFT, PAID or VOID
+        ALLOCATION_EXCEEDS_INVOICE_BALANCE: 422 - allocations on an invoice would exceed its total less credit notes
+        ALLOCATION_EXCEEDS_PAYMENT: 422 - the sum of allocations is greater than the payment amount
+        ALLOCATION_CLIENT_MISMATCH: 422 - an allocated invoice belongs to another client
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PaymentCreate'
+      responses:
+        '201':
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /payments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    delete:
+      tags: [Payments]
+      operationId: deletePayment
+      summary: Delete a payment and reverse its allocations
+      description: Invoice `amountPaid` and status are recomputed. The deletion is written to the audit log.
+      x-roles: [OWNER, OFFICE]
+      responses:
+        '204':
+          description: Deleted and allocations reversed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /exports/payments.csv:
+    get:
+      tags: [Payments]
+      operationId: exportPaymentsCsv
+      summary: Export payments in a date range as CSV for the accountant
+      description: One row per payment allocation, filtered by `receivedDate`.
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: First received date to include (inclusive).
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Last received date to include (inclusive).
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema:
+                type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  # ---------------------------------------------------------------- Reports
+  /reports/dashboard:
+    get:
+      tags: [Reports]
+      operationId: getDashboardReport
+      summary: Business state at a glance
+      description: Only ISSUED, PARTIALLY_PAID and PAID invoices count as billed. DRAFT and VOID never appear in totals.
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - $ref: '#/components/parameters/ReportFormat'
+      responses:
+        '200':
+          description: Dashboard figures
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardReport'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /reports/projects/{id}/summary:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Reports]
+      operationId: getProjectSummaryReport
+      summary: Financial and site progress of one project
+      description: PROJECT_MANAGER must be a member of the project.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ReportFormat'
+      responses:
+        '200':
+          description: Project summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectSummaryReport'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /reports/receivables-ageing:
+    get:
+      tags: [Reports]
+      operationId: getReceivablesAgeingReport
+      summary: Outstanding per client in overdue buckets
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - name: asOf
+          in: query
+          description: Date the ageing is calculated for. Defaults to today (Asia/Kuala_Lumpur).
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/ClientIdQuery'
+        - $ref: '#/components/parameters/ProjectIdQuery'
+        - $ref: '#/components/parameters/ReportFormat'
+      responses:
+        '200':
+          description: Receivables ageing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReceivablesAgeingReport'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /reports/quotation-pipeline:
+    get:
+      tags: [Reports]
+      operationId: getQuotationPipelineReport
+      summary: Quotation count and value by status, win rate, by month
+      description: Counts the latest revision of each quotation, by `issueDate`.
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ClientIdQuery'
+        - $ref: '#/components/parameters/ReportFormat'
+      responses:
+        '200':
+          description: Quotation pipeline
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuotationPipelineReport'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /reports/billing-collections:
+    get:
+      tags: [Reports]
+      operationId: getBillingCollectionsReport
+      summary: Invoiced vs received per month
+      description: Defaults to the last 12 months when `from` and `to` are not given.
+      x-roles: [OWNER, OFFICE]
+      parameters:
+        - $ref: '#/components/parameters/From'
+        - $ref: '#/components/parameters/To'
+        - $ref: '#/components/parameters/ClientIdQuery'
+        - $ref: '#/components/parameters/ProjectIdQuery'
+        - $ref: '#/components/parameters/ReportFormat'
+      responses:
+        '200':
+          description: Billing and collections
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingCollectionsReport'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+  /reports/retention:
+    get:
+      tags: [Reports]
+      operationId: getRetentionRegisterReport
+      summary: Retention held, released and balance per project
+      description: PROJECT_MANAGER sees only own projects.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      parameters:
+        - $ref: '#/components/parameters/ClientIdQuery'
+        - $ref: '#/components/parameters/ProjectIdQuery'
+        - $ref: '#/components/parameters/ReportFormat'
+      responses:
+        '200':
+          description: Retention register
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionRegisterReport'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+  /reports/daily-report-compliance:
+    get:
+      tags: [Reports]
+      operationId: getDailyReportComplianceReport
+      summary: Daily reports submitted vs expected, per project and per site staff
+      description: >-
+        Expected reports are counted on working days (Monday to Saturday by default; public
+        holidays are ignored). PROJECT_MANAGER sees only own projects.
+      x-roles: [OWNER, OFFICE, PROJECT_MANAGER]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: First report date to include (inclusive).
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Last report date to include (inclusive).
+          schema:
+            type: string
+            format: date
+        - $ref: '#/components/parameters/ProjectIdQuery'
+        - $ref: '#/components/parameters/ReportFormat'
+      responses:
+        '200':
+          description: Daily report compliance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DailyReportComplianceReport'
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token from `POST /auth/login` or `POST /auth/refresh`. Expires after 15 minutes.
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      description: UUID of the resource named in the path.
+      schema:
+        type: string
+        format: uuid
+    Page:
+      name: page
+      in: query
+      description: Page number, starting at 1.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSize:
+      name: pageSize
+      in: query
+      description: Items per page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Sort:
+      name: sort
+      in: query
+      description: Field to sort by. Prefix with `-` for descending, e.g. `-createdAt`.
+      schema:
+        type: string
+        default: '-createdAt'
+    Q:
+      name: q
+      in: query
+      description: Free-text search over the main text fields of the resource.
+      schema:
+        type: string
+    From:
+      name: from
+      in: query
+      description: Start of the date range (inclusive), a business date in Asia/Kuala_Lumpur.
+      schema:
+        type: string
+        format: date
+    To:
+      name: to
+      in: query
+      description: End of the date range (inclusive), a business date in Asia/Kuala_Lumpur.
+      schema:
+        type: string
+        format: date
+    ProjectIdQuery:
+      name: projectId
+      in: query
+      description: Filter by project.
+      schema:
+        type: string
+        format: uuid
+    ClientIdQuery:
+      name: clientId
+      in: query
+      description: Filter by client.
+      schema:
+        type: string
+        format: uuid
+    ReportFormat:
+      name: format
+      in: query
+      description: Use `xlsx` to receive the report as an Excel file instead of JSON.
+      schema:
+        type: string
+        enum: [json, xlsx]
+        default: json
+
+  responses:
+    Unauthorized:
+      description: Missing, invalid or expired credentials. See `x-error-codes` of the operation for specific codes.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 401
+            code: UNAUTHENTICATED
+            message: Access token is missing or expired
+    Forbidden:
+      description: The role is not allowed, or the user is not a member of the project.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 403
+            code: FORBIDDEN
+            message: You do not have access to this resource
+    NotFound:
+      description: The resource does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 404
+            code: NOT_FOUND
+            message: Resource not found
+    Conflict:
+      description: The request conflicts with the current state. See `x-error-codes` of the operation for specific codes.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 409
+            code: QUOTATION_NOT_EDITABLE
+            message: Only DRAFT quotations can be edited
+    UnprocessableEntity:
+      description: >-
+        Validation failed (`VALIDATION_ERROR`, with field errors in `details`) or a business
+        rule was broken. See `x-error-codes` of the operation for specific codes.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 422
+            code: VALIDATION_ERROR
+            message: Validation failed
+            details:
+              - path: sections.0.items.1.quantity
+                message: Must be a decimal string
+    TooManyRequests:
+      description: Rate limit reached.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 429
+            code: LOGIN_LOCKED
+            message: Too many failed attempts. Try again in 15 minutes
+
+  schemas:
+    # -------------------------------------------------------------- Common
+    Error:
+      type: object
+      required: [statusCode, code, message]
+      properties:
+        statusCode:
+          type: integer
+          examples: [409]
+        code:
+          type: string
+          description: Stable machine-readable error code.
+          examples: [QUOTATION_NOT_EDITABLE]
+        message:
+          type: string
+          description: Human-readable message.
+        details:
+          description: >-
+            Optional extra information. For `VALIDATION_ERROR` an array of
+            `{ path, message }`; for other codes an object described in `x-error-codes`.
+          oneOf:
+            - type: array
+              items:
+                type: object
+                required: [path, message]
+                properties:
+                  path:
+                    type: string
+                  message:
+                    type: string
+            - type: object
+              additionalProperties: true
+    Page:
+      type: object
+      description: Envelope fields of every list response.
+      required: [items, total, page, pageSize]
+      properties:
+        items:
+          type: array
+          items: {}
+        total:
+          type: integer
+          minimum: 0
+          description: Total number of items matching the query.
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+    BaseEntity:
+      type: object
+      required: [id, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    Money:
+      type: string
+      pattern: '^-?\d{1,12}\.\d{2}$'
+      description: Amount in MYR as a decimal string with exactly 2 places. Never a JSON number.
+      examples: ['12500.00']
+    NullableMoney:
+      type: [string, 'null']
+      pattern: '^-?\d{1,12}\.\d{2}$'
+      description: Amount in MYR as a decimal string with exactly 2 places, or null.
+      examples: ['12500.00']
+    Quantity:
+      type: string
+      pattern: '^-?\d{1,11}(\.\d{1,3})?$'
+      description: Quantity as a decimal string with up to 3 places.
+      examples: ['12.500']
+    Percent:
+      type: string
+      pattern: '^\d{1,3}(\.\d{1,2})?$'
+      description: Percentage as a decimal string with up to 2 places.
+      examples: ['8.00']
+    Role:
+      type: string
+      enum: [OWNER, OFFICE, PROJECT_MANAGER, SITE_STAFF]
+    ProjectStatus:
+      type: string
+      enum: [DRAFT, ACTIVE, ON_HOLD, COMPLETED, CLOSED]
+    QuotationStatus:
+      type: string
+      enum: [DRAFT, SENT, ACCEPTED, REJECTED, SUPERSEDED, EXPIRED]
+    VariationStatus:
+      type: string
+      enum: [DRAFT, SUBMITTED, APPROVED, REJECTED]
+    InvoiceType:
+      type: string
+      enum: [SIMPLE, PROGRESS_CLAIM, RETENTION_RELEASE]
+    InvoiceStatus:
+      type: string
+      enum: [DRAFT, ISSUED, PARTIALLY_PAID, PAID, VOID]
+    DailyReportStatus:
+      type: string
+      enum: [SUBMITTED, REVIEWED]
+    Weather:
+      type: string
+      enum: [SUNNY, CLOUDY, RAIN, HEAVY_RAIN]
+    EInvoiceStatus:
+      type: string
+      enum: [NOT_REQUIRED, PENDING, SUBMITTED, VALID, INVALID, CANCELLED]
+    FileStatus:
+      type: string
+      enum: [PENDING, READY]
+
+    # -------------------------------------------------------------- Auth
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+        deviceName:
+          type: string
+          maxLength: 100
+          description: Label stored with the refresh token so it can be revoked per device.
+    TokenPair:
+      type: object
+      required: [accessToken, refreshToken, expiresIn]
+      properties:
+        accessToken:
+          type: string
+          description: JWT, valid for 15 minutes.
+        refreshToken:
+          type: string
+          description: Opaque token, single use, rotated on every refresh.
+        expiresIn:
+          type: integer
+          description: Lifetime of the access token in seconds.
+          examples: [900]
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/TokenPair'
+        - type: object
+          required: [user]
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    LogoutRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+
+    # -------------------------------------------------------------- Users
+    User:
+      description: A user. `passwordHash` is never returned.
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [email, name, role, isActive]
+          properties:
+            email:
+              type: string
+              format: email
+            name:
+              type: string
+            phone:
+              type: [string, 'null']
+            role:
+              $ref: '#/components/schemas/Role'
+            isActive:
+              type: boolean
+    UserSummary:
+      type: object
+      description: Short user reference embedded in other resources.
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+    UserCreate:
+      type: object
+      required: [email, name, role, password]
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        phone:
+          type: [string, 'null']
+          maxLength: 30
+        role:
+          $ref: '#/components/schemas/Role'
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Initial password. Stored as an argon2id hash.
+    UserUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        phone:
+          type: [string, 'null']
+          maxLength: 30
+        role:
+          $ref: '#/components/schemas/Role'
+        isActive:
+          type: boolean
+          description: False deactivates the user and revokes all refresh tokens.
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: Sets a new password (reset by the OWNER). Revokes all refresh tokens of the user.
+    UserList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/User'
+
+    # -------------------------------------------------------------- Company
+    Company:
+      description: Company settings (single row). These details appear on documents.
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [name, defaultPaymentTermDays, defaultRetentionPercent, defaultRetentionCapPercent]
+          properties:
+            name:
+              type: string
+            registrationNo:
+              type: [string, 'null']
+              description: SSM registration number.
+            tin:
+              type: [string, 'null']
+              description: Tax identification number (LHDN).
+            sstNo:
+              type: [string, 'null']
+            msicCode:
+              type: [string, 'null']
+            address:
+              type: [string, 'null']
+            phone:
+              type: [string, 'null']
+            email:
+              type: [string, 'null']
+              format: email
+            logoFileId:
+              type: [string, 'null']
+              format: uuid
+            bankDetails:
+              type: [string, 'null']
+              description: Free text printed on invoices.
+            defaultPaymentTermDays:
+              type: integer
+              minimum: 0
+            defaultRetentionPercent:
+              $ref: '#/components/schemas/Percent'
+            defaultRetentionCapPercent:
+              $ref: '#/components/schemas/Percent'
+    CompanyUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+        registrationNo:
+          type: [string, 'null']
+        tin:
+          type: [string, 'null']
+        sstNo:
+          type: [string, 'null']
+        msicCode:
+          type: [string, 'null']
+        address:
+          type: [string, 'null']
+        phone:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+          format: email
+        logoFileId:
+          type: [string, 'null']
+          format: uuid
+          description: File id from `POST /files/presign`.
+        bankDetails:
+          type: [string, 'null']
+        defaultPaymentTermDays:
+          type: integer
+          minimum: 0
+        defaultRetentionPercent:
+          $ref: '#/components/schemas/Percent'
+        defaultRetentionCapPercent:
+          $ref: '#/components/schemas/Percent'
+    TaxRate:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [name, percent, isDefault, isActive]
+          properties:
+            name:
+              type: string
+              examples: [SST 8%]
+            percent:
+              $ref: '#/components/schemas/Percent'
+            isDefault:
+              type: boolean
+            isActive:
+              type: boolean
+    TaxRateCreate:
+      type: object
+      required: [name, percent]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        percent:
+          $ref: '#/components/schemas/Percent'
+        isDefault:
+          type: boolean
+          default: false
+        isActive:
+          type: boolean
+          default: true
+    TaxRateUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        percent:
+          $ref: '#/components/schemas/Percent'
+        isDefault:
+          type: boolean
+        isActive:
+          type: boolean
+    TaxRateList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/TaxRate'
+
+    # -------------------------------------------------------------- Clients
+    Client:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [name, isActive]
+          properties:
+            name:
+              type: string
+            registrationNo:
+              type: [string, 'null']
+            tin:
+              type: [string, 'null']
+            sstNo:
+              type: [string, 'null']
+            address:
+              type: [string, 'null']
+            contactName:
+              type: [string, 'null']
+            phone:
+              type: [string, 'null']
+            email:
+              type: [string, 'null']
+              format: email
+            isActive:
+              type: boolean
+    ClientSummary:
+      type: object
+      description: Short client reference embedded in other resources.
+      required: [id, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+    ClientCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        registrationNo:
+          type: [string, 'null']
+        tin:
+          type: [string, 'null']
+        sstNo:
+          type: [string, 'null']
+        address:
+          type: [string, 'null']
+        contactName:
+          type: [string, 'null']
+        phone:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+          format: email
+    ClientUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        registrationNo:
+          type: [string, 'null']
+        tin:
+          type: [string, 'null']
+        sstNo:
+          type: [string, 'null']
+        address:
+          type: [string, 'null']
+        contactName:
+          type: [string, 'null']
+        phone:
+          type: [string, 'null']
+        email:
+          type: [string, 'null']
+          format: email
+        isActive:
+          type: boolean
+          description: False deactivates the client. Clients are never deleted.
+    ClientList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Client'
+
+    # -------------------------------------------------------------- Projects
+    Project:
+      description: >-
+        A project. Price fields are omitted for SITE_STAFF: the `contractSum` property is
+        absent from the response (not null) when the caller has the SITE_STAFF role.
+        `members` is only included by `GET /projects/{id}`.
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [code, name, clientId, status]
+          properties:
+            code:
+              type: string
+              description: Unique project code.
+            name:
+              type: string
+            clientId:
+              type: string
+              format: uuid
+            client:
+              allOf:
+                - $ref: '#/components/schemas/ClientSummary'
+              readOnly: true
+            siteAddress:
+              type: [string, 'null']
+            status:
+              $ref: '#/components/schemas/ProjectStatus'
+            startDate:
+              type: [string, 'null']
+              format: date
+            endDate:
+              type: [string, 'null']
+              format: date
+            contractSum:
+              allOf:
+                - $ref: '#/components/schemas/NullableMoney'
+              readOnly: true
+              description: >-
+                Original contract sum, set when a quotation is converted to the contract.
+                Null until then. Omitted for SITE_STAFF.
+            retentionPercent:
+              $ref: '#/components/schemas/Percent'
+            retentionCapPercent:
+              $ref: '#/components/schemas/Percent'
+            defectsLiabilityMonths:
+              type: integer
+              minimum: 0
+            members:
+              type: array
+              readOnly: true
+              items:
+                $ref: '#/components/schemas/ProjectMember'
+    ProjectRef:
+      type: object
+      description: Short project reference embedded in other resources. Carries no price fields.
+      required: [id, code, name]
+      properties:
+        id:
+          type: string
+          format: uuid
+        code:
+          type: string
+        name:
+          type: string
+    ProjectCreate:
+      type: object
+      required: [code, name, clientId]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 30
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        clientId:
+          type: string
+          format: uuid
+        siteAddress:
+          type: [string, 'null']
+        status:
+          allOf:
+            - $ref: '#/components/schemas/ProjectStatus'
+          default: DRAFT
+        startDate:
+          type: [string, 'null']
+          format: date
+        endDate:
+          type: [string, 'null']
+          format: date
+        retentionPercent:
+          allOf:
+            - $ref: '#/components/schemas/Percent'
+          description: Defaults to `Company.defaultRetentionPercent`.
+        retentionCapPercent:
+          allOf:
+            - $ref: '#/components/schemas/Percent'
+          description: Defaults to `Company.defaultRetentionCapPercent`.
+        defectsLiabilityMonths:
+          type: integer
+          minimum: 0
+          default: 0
+    ProjectUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        code:
+          type: string
+          minLength: 1
+          maxLength: 30
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        siteAddress:
+          type: [string, 'null']
+        status:
+          $ref: '#/components/schemas/ProjectStatus'
+        startDate:
+          type: [string, 'null']
+          format: date
+        endDate:
+          type: [string, 'null']
+          format: date
+        retentionPercent:
+          $ref: '#/components/schemas/Percent'
+        retentionCapPercent:
+          $ref: '#/components/schemas/Percent'
+        defectsLiabilityMonths:
+          type: integer
+          minimum: 0
+    ProjectList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Project'
+    ProjectMember:
+      type: object
+      required: [projectId, userId, user]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        projectId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        user:
+          allOf:
+            - $ref: '#/components/schemas/UserSummary'
+          readOnly: true
+    ProjectMembersInput:
+      type: object
+      required: [userIds]
+      properties:
+        userIds:
+          type: array
+          uniqueItems: true
+          description: The complete member list. Users not listed are removed from the project.
+          items:
+            type: string
+            format: uuid
+    ProjectMemberList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/ProjectMember'
+
+    # -------------------------------------------------------------- Files
+    PresignRequest:
+      type: object
+      required: [fileName, mimeType, size, purpose]
+      properties:
+        fileName:
+          type: string
+          minLength: 1
+          maxLength: 255
+        mimeType:
+          type: string
+          examples: [image/jpeg]
+        size:
+          type: integer
+          minimum: 1
+          description: Size in bytes.
+        purpose:
+          type: string
+          description: What the file is for. Decides the allowed types, size limit and bucket prefix.
+          examples: [DAILY_REPORT_PHOTO, COMPANY_LOGO]
+    PresignResponse:
+      type: object
+      required: [fileId, uploadUrl, expiresAt]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+          description: Id of the `File` row (status PENDING). Reference it when saving the parent record.
+        uploadUrl:
+          type: string
+          format: uri
+          description: Presigned URL. Upload with HTTP PUT and a `Content-Type` header equal to `mimeType`.
+        expiresAt:
+          type: string
+          format: date-time
+    FileUrl:
+      type: object
+      required: [url, expiresAt]
+      properties:
+        url:
+          type: string
+          format: uri
+          description: Short-lived presigned download URL.
+        expiresAt:
+          type: string
+          format: date-time
+
+    # -------------------------------------------------------------- Quotations
+    QuotationSummary:
+      description: Quotation header as returned in lists.
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [number, rootId, revisionNo, clientId, title, status, subtotal, discountAmount, taxAmount, total]
+          properties:
+            number:
+              type: string
+              readOnly: true
+              description: Assigned when the draft is first saved. Shared by all revisions.
+              examples: [QT-2026-0001]
+            rootId:
+              type: string
+              format: uuid
+              readOnly: true
+              description: Id of the first revision.
+            revisionNo:
+              type: integer
+              minimum: 0
+              readOnly: true
+            clientId:
+              type: string
+              format: uuid
+            client:
+              allOf:
+                - $ref: '#/components/schemas/ClientSummary'
+              readOnly: true
+            projectId:
+              type: [string, 'null']
+              format: uuid
+            title:
+              type: string
+            status:
+              allOf:
+                - $ref: '#/components/schemas/QuotationStatus'
+              readOnly: true
+              description: A SENT quotation past `validUntil` is returned as EXPIRED.
+            issueDate:
+              type: [string, 'null']
+              format: date
+            validUntil:
+              type: [string, 'null']
+              format: date
+            subtotal:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+              description: Sum of item amounts.
+            discountAmount:
+              $ref: '#/components/schemas/Money'
+            taxAmount:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+            total:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+              description: subtotal - discountAmount + taxAmount.
+            createdById:
+              type: string
+              format: uuid
+              readOnly: true
+    Quotation:
+      description: Full quotation with sections and items.
+      allOf:
+        - $ref: '#/components/schemas/QuotationSummary'
+        - type: object
+          required: [sections]
+          properties:
+            terms:
+              type: [string, 'null']
+            notes:
+              type: [string, 'null']
+            pdfFileId:
+              type: [string, 'null']
+              format: uuid
+              readOnly: true
+              description: Stored PDF, set when the quotation is sent.
+            rejectionReason:
+              type: [string, 'null']
+              readOnly: true
+            sections:
+              type: array
+              items:
+                $ref: '#/components/schemas/QuotationSection'
+    QuotationSection:
+      type: object
+      required: [id, sortOrder, title, items]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        quotationId:
+          type: string
+          format: uuid
+          readOnly: true
+        sortOrder:
+          type: integer
+          readOnly: true
+          description: Position, taken from the array order of the last save.
+        title:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotationItem'
+    QuotationItem:
+      type: object
+      required: [id, sectionId, sortOrder, description, quantity, rate, amount, taxPercent]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        quotationId:
+          type: string
+          format: uuid
+          readOnly: true
+        sectionId:
+          type: string
+          format: uuid
+          readOnly: true
+        sortOrder:
+          type: integer
+          readOnly: true
+        description:
+          type: string
+        unit:
+          type: [string, 'null']
+        quantity:
+          $ref: '#/components/schemas/Quantity'
+        rate:
+          $ref: '#/components/schemas/Money'
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: round(quantity x rate, 2).
+        taxRateId:
+          type: [string, 'null']
+          format: uuid
+        taxPercent:
+          allOf:
+            - $ref: '#/components/schemas/Percent'
+          readOnly: true
+          description: Snapshot of the tax rate percent at the time of saving. 0.00 when no tax rate is set.
+    QuotationInput:
+      type: object
+      description: >-
+        Full quotation document for `POST /quotations` and `PUT /quotations/{id}`. Totals are
+        never accepted from the client. Section and item order is the array order.
+      required: [clientId, title, sections]
+      properties:
+        clientId:
+          type: string
+          format: uuid
+        projectId:
+          type: [string, 'null']
+          format: uuid
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        issueDate:
+          type: [string, 'null']
+          format: date
+        validUntil:
+          type: [string, 'null']
+          format: date
+        terms:
+          type: [string, 'null']
+        notes:
+          type: [string, 'null']
+        discountAmount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          default: '0.00'
+          description: Discount on the whole quotation, shared across items in proportion to amount when tax is calculated.
+        sections:
+          type: array
+          description: May be empty while drafting. A quotation with no items cannot be sent.
+          items:
+            $ref: '#/components/schemas/QuotationSectionInput'
+    QuotationSectionInput:
+      type: object
+      required: [title, items]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of an existing section to keep, or a client-generated id for a new one. Optional.
+        title:
+          type: string
+          maxLength: 300
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuotationItemInput'
+    QuotationItemInput:
+      type: object
+      required: [description, quantity, rate]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of an existing item to keep, or a client-generated id for a new one. Optional.
+        description:
+          type: string
+          minLength: 1
+        unit:
+          type: [string, 'null']
+          maxLength: 30
+        quantity:
+          $ref: '#/components/schemas/Quantity'
+        rate:
+          $ref: '#/components/schemas/Money'
+        taxRateId:
+          type: [string, 'null']
+          format: uuid
+          description: Tax rate of this line. Null means no tax.
+    QuotationRejectRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    QuotationList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/QuotationSummary'
+
+    # -------------------------------------------------------------- Daily reports
+    DailyReport:
+      description: >-
+        A daily site report. It carries no price fields. Price fields are omitted for
+        SITE_STAFF everywhere, so any embedded project or contract item data in this resource
+        never includes rates, amounts or the contract sum.
+      type: object
+      required: [id, projectId, reportDate, submittedById, workDone, status, manpower, photos, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Generated on the phone (UUID v7) and sent as the path id of the PUT.
+        projectId:
+          type: string
+          format: uuid
+        project:
+          allOf:
+            - $ref: '#/components/schemas/ProjectRef'
+          readOnly: true
+        reportDate:
+          type: string
+          format: date
+        submittedById:
+          type: string
+          format: uuid
+          readOnly: true
+        submittedBy:
+          allOf:
+            - $ref: '#/components/schemas/UserSummary'
+          readOnly: true
+        weather:
+          oneOf:
+            - $ref: '#/components/schemas/Weather'
+            - type: 'null'
+        workDone:
+          type: string
+        issues:
+          type: [string, 'null']
+        nextDayPlan:
+          type: [string, 'null']
+        status:
+          allOf:
+            - $ref: '#/components/schemas/DailyReportStatus'
+          readOnly: true
+        reviewedById:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+        reviewedAt:
+          type: [string, 'null']
+          format: date-time
+          readOnly: true
+        latitude:
+          type: [number, 'null']
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: [number, 'null']
+          minimum: -180
+          maximum: 180
+        deviceCreatedAt:
+          type: [string, 'null']
+          format: date-time
+          description: Device time when the report was created on the phone.
+        isEditable:
+          type: boolean
+          readOnly: true
+          description: True while the caller is the author, the report is not REVIEWED and the 48 hour window is open.
+        manpower:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyReportManpower'
+        photos:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyReportPhoto'
+        progress:
+          type: array
+          description: Optional site estimate per contract item, used as a hint when preparing claims.
+          items:
+            $ref: '#/components/schemas/DailyReportProgress'
+        createdAt:
+          type: string
+          format: date-time
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          readOnly: true
+    DailyReportManpower:
+      type: object
+      required: [trade, headcount]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        trade:
+          type: string
+          examples: [Bricklayer]
+        headcount:
+          type: integer
+          minimum: 0
+    DailyReportPhoto:
+      type: object
+      required: [fileId, sortOrder]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fileId:
+          type: string
+          format: uuid
+        caption:
+          type: [string, 'null']
+        takenAt:
+          type: [string, 'null']
+          format: date-time
+        sortOrder:
+          type: integer
+          readOnly: true
+        url:
+          type: string
+          format: uri
+          readOnly: true
+          description: Short-lived presigned download URL for the photo.
+    DailyReportProgress:
+      type: object
+      required: [contractItemId, percentComplete]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        contractItemId:
+          type: string
+          format: uuid
+        percentComplete:
+          $ref: '#/components/schemas/Percent'
+    DailyReportInput:
+      type: object
+      description: >-
+        Full daily report document for `PUT /daily-reports/{id}`. Manpower, photos and
+        progress rows not present in the body are removed. Photo order is the array order.
+      required: [projectId, reportDate, workDone, manpower, photos]
+      properties:
+        projectId:
+          type: string
+          format: uuid
+          description: Cannot be changed once the report exists.
+        reportDate:
+          type: string
+          format: date
+          description: Today or up to 2 days back (Asia/Kuala_Lumpur), never in the future.
+        weather:
+          oneOf:
+            - $ref: '#/components/schemas/Weather'
+            - type: 'null'
+        workDone:
+          type: string
+          minLength: 1
+        issues:
+          type: [string, 'null']
+        nextDayPlan:
+          type: [string, 'null']
+        latitude:
+          type: [number, 'null']
+          minimum: -90
+          maximum: 90
+          description: GPS position if permission was granted. Missing GPS does not block submission.
+        longitude:
+          type: [number, 'null']
+          minimum: -180
+          maximum: 180
+        deviceCreatedAt:
+          type: [string, 'null']
+          format: date-time
+        manpower:
+          type: array
+          description: May be empty.
+          items:
+            $ref: '#/components/schemas/DailyReportManpowerInput'
+        photos:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/DailyReportPhotoInput'
+        progress:
+          type: array
+          items:
+            $ref: '#/components/schemas/DailyReportProgressInput'
+    DailyReportManpowerInput:
+      type: object
+      required: [trade, headcount]
+      properties:
+        trade:
+          type: string
+          minLength: 1
+          maxLength: 100
+        headcount:
+          type: integer
+          minimum: 0
+    DailyReportPhotoInput:
+      type: object
+      required: [fileId]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+          description: File id from `POST /files/presign`, already uploaded to the bucket.
+        caption:
+          type: [string, 'null']
+          maxLength: 300
+        takenAt:
+          type: [string, 'null']
+          format: date-time
+    DailyReportProgressInput:
+      type: object
+      required: [contractItemId, percentComplete]
+      properties:
+        contractItemId:
+          type: string
+          format: uuid
+        percentComplete:
+          $ref: '#/components/schemas/Percent'
+    DailyReportList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/DailyReport'
+
+    # -------------------------------------------------------------- Contract and variation orders
+    ContractFromQuotationInput:
+      type: object
+      required: [quotationId]
+      properties:
+        quotationId:
+          type: string
+          format: uuid
+          description: An ACCEPTED quotation.
+    Contract:
+      type: object
+      description: The contract of a project. All fields are calculated by the server.
+      required: [projectId, items, originalSum, approvedVariationOrders, approvedVariationsTotal, currentSum, claimedToDate, retentionHeld]
+      properties:
+        projectId:
+          type: string
+          format: uuid
+          readOnly: true
+        items:
+          type: array
+          readOnly: true
+          description: Original items copied from the quotation plus items added by approved variation orders.
+          items:
+            $ref: '#/components/schemas/ContractItem'
+        originalSum:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: Sum of the original contract items (equals `Project.contractSum`).
+        approvedVariationOrders:
+          type: array
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/VariationOrderSummary'
+        approvedVariationsTotal:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: Sum of APPROVED variation order totals. Can be negative.
+        currentSum:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: originalSum + approvedVariationsTotal.
+        claimedToDate:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: grossToDate of the latest issued progress claim.
+        retentionHeld:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: retentionToDate of the latest issued claim less issued retention releases.
+    ContractItem:
+      type: object
+      description: A contract line. Never editable through the API.
+      required: [id, projectId, sortOrder, description, quantity, rate, amount, taxPercent]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        projectId:
+          type: string
+          format: uuid
+          readOnly: true
+        sourceQuotationItemId:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+        variationOrderId:
+          type: [string, 'null']
+          format: uuid
+          readOnly: true
+          description: Set for items added by an approved variation order.
+        sectionTitle:
+          type: [string, 'null']
+          readOnly: true
+        sortOrder:
+          type: integer
+          readOnly: true
+        description:
+          type: string
+          readOnly: true
+        unit:
+          type: [string, 'null']
+          readOnly: true
+        quantity:
+          allOf:
+            - $ref: '#/components/schemas/Quantity'
+          readOnly: true
+        rate:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+        taxPercent:
+          allOf:
+            - $ref: '#/components/schemas/Percent'
+          readOnly: true
+    VariationOrderSummary:
+      description: Variation order header as returned in lists.
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [number, projectId, title, status, total]
+          properties:
+            number:
+              type: string
+              readOnly: true
+              examples: [VO-2026-0001]
+            projectId:
+              type: string
+              format: uuid
+              readOnly: true
+            title:
+              type: string
+            reason:
+              type: [string, 'null']
+            status:
+              allOf:
+                - $ref: '#/components/schemas/VariationStatus'
+              readOnly: true
+            approvedAt:
+              type: [string, 'null']
+              format: date-time
+              readOnly: true
+            total:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+              description: Sum of item amounts. Negative for omissions.
+            createdById:
+              type: string
+              format: uuid
+              readOnly: true
+    VariationOrder:
+      description: Full variation order with items.
+      allOf:
+        - $ref: '#/components/schemas/VariationOrderSummary'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/VariationOrderItem'
+    VariationOrderItem:
+      type: object
+      required: [id, description, quantity, rate, amount]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        variationOrderId:
+          type: string
+          format: uuid
+          readOnly: true
+        description:
+          type: string
+        unit:
+          type: [string, 'null']
+        quantity:
+          allOf:
+            - $ref: '#/components/schemas/Quantity'
+          description: Negative for an omission.
+        rate:
+          $ref: '#/components/schemas/Money'
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: round(quantity x rate, 2).
+    VariationOrderInput:
+      type: object
+      description: Full variation order document. Item order is the array order.
+      required: [title, items]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 300
+        reason:
+          type: [string, 'null']
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/VariationOrderItemInput'
+    VariationOrderItemInput:
+      type: object
+      required: [description, quantity, rate]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of an existing item to keep. Optional.
+        description:
+          type: string
+          minLength: 1
+        unit:
+          type: [string, 'null']
+          maxLength: 30
+        quantity:
+          allOf:
+            - $ref: '#/components/schemas/Quantity'
+          description: Negative for an omission.
+        rate:
+          $ref: '#/components/schemas/Money'
+    VariationOrderList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/VariationOrderSummary'
+
+    # -------------------------------------------------------------- Invoices
+    InvoiceSummary:
+      description: >-
+        Invoice header as returned in lists. Used for all three invoice types. The claim
+        fields (`claimNo`, `periodFrom`, `periodTo`, `grossToDate`, `retentionToDate`,
+        `previousNetCertified`) are null unless `type` is PROGRESS_CLAIM.
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [type, clientId, status, subtotal, taxAmount, total, amountPaid, eInvoiceStatus]
+          properties:
+            number:
+              type: [string, 'null']
+              readOnly: true
+              description: Assigned when the invoice is issued. Null while DRAFT.
+              examples: [INV-2026-0001, PC-2026-0001]
+            type:
+              allOf:
+                - $ref: '#/components/schemas/InvoiceType'
+              readOnly: true
+            projectId:
+              type: [string, 'null']
+              format: uuid
+              description: Null is allowed for SIMPLE invoices only.
+            project:
+              oneOf:
+                - $ref: '#/components/schemas/ProjectRef'
+                - type: 'null'
+              readOnly: true
+            clientId:
+              type: string
+              format: uuid
+            client:
+              allOf:
+                - $ref: '#/components/schemas/ClientSummary'
+              readOnly: true
+            status:
+              allOf:
+                - $ref: '#/components/schemas/InvoiceStatus'
+              readOnly: true
+            issueDate:
+              type: [string, 'null']
+              format: date
+            dueDate:
+              type: [string, 'null']
+              format: date
+              readOnly: true
+              description: issueDate + payment term, set when the invoice is issued.
+            claimNo:
+              type: [integer, 'null']
+              readOnly: true
+              description: Consecutive claim number per project (1, 2, 3...).
+            periodFrom:
+              type: [string, 'null']
+              format: date
+            periodTo:
+              type: [string, 'null']
+              format: date
+            grossToDate:
+              allOf:
+                - $ref: '#/components/schemas/NullableMoney'
+              readOnly: true
+              description: Sum of contract item amount x cumulativePercent / 100, including approved variation order items.
+            retentionToDate:
+              allOf:
+                - $ref: '#/components/schemas/NullableMoney'
+              readOnly: true
+              description: min(grossToDate x retentionPercent / 100, currentContractSum x retentionCapPercent / 100).
+            previousNetCertified:
+              allOf:
+                - $ref: '#/components/schemas/NullableMoney'
+              readOnly: true
+              description: grossToDate - retentionToDate of the previous ISSUED claim on the project. 0.00 for claim 1.
+            taxPercent:
+              oneOf:
+                - $ref: '#/components/schemas/Percent'
+                - type: 'null'
+              readOnly: true
+              description: >-
+                Tax percent applied to the subtotal of a PROGRESS_CLAIM or RETENTION_RELEASE.
+                Null for SIMPLE invoices, where tax is per line.
+            subtotal:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+              description: >-
+                SIMPLE: sum of line amounts. PROGRESS_CLAIM: (grossToDate - retentionToDate) -
+                previousNetCertified. RETENTION_RELEASE: the amount released.
+            taxAmount:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+            total:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+              description: subtotal + taxAmount.
+            amountPaid:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+              description: Sum of payment allocations.
+            eInvoiceStatus:
+              allOf:
+                - $ref: '#/components/schemas/EInvoiceStatus'
+              readOnly: true
+            createdById:
+              type: string
+              format: uuid
+              readOnly: true
+    Invoice:
+      description: >-
+        Full invoice. `lines` is filled for SIMPLE invoices, `claimLines` for PROGRESS_CLAIM.
+        A RETENTION_RELEASE has a single generated line.
+      allOf:
+        - $ref: '#/components/schemas/InvoiceSummary'
+        - type: object
+          required: [lines, claimLines, creditNotes]
+          properties:
+            notes:
+              type: [string, 'null']
+            pdfFileId:
+              type: [string, 'null']
+              format: uuid
+              readOnly: true
+            voidReason:
+              type: [string, 'null']
+              readOnly: true
+            voidedAt:
+              type: [string, 'null']
+              format: date-time
+              readOnly: true
+            buyer:
+              description: Client details copied when the invoice is issued (spec 04 AC11). Null while DRAFT.
+              readOnly: true
+              type: [object, 'null']
+              properties:
+                name: { type: [string, 'null'] }
+                registrationNo: { type: [string, 'null'] }
+                tin: { type: [string, 'null'] }
+                sstNo: { type: [string, 'null'] }
+                address: { type: [string, 'null'] }
+            supplier:
+              description: Company details copied when the invoice is issued (spec 04 AC11). Null while DRAFT.
+              readOnly: true
+              type: [object, 'null']
+              properties:
+                name: { type: [string, 'null'] }
+                registrationNo: { type: [string, 'null'] }
+                tin: { type: [string, 'null'] }
+                sstNo: { type: [string, 'null'] }
+                msicCode: { type: [string, 'null'] }
+                address: { type: [string, 'null'] }
+            eInvoiceUuid:
+              type: [string, 'null']
+              readOnly: true
+            eInvoiceLongId:
+              type: [string, 'null']
+              readOnly: true
+            eInvoiceValidatedAt:
+              type: [string, 'null']
+              format: date-time
+              readOnly: true
+            lines:
+              type: array
+              items:
+                $ref: '#/components/schemas/InvoiceLine'
+            claimLines:
+              type: array
+              items:
+                $ref: '#/components/schemas/ClaimLine'
+            creditNotes:
+              type: array
+              readOnly: true
+              items:
+                $ref: '#/components/schemas/CreditNote'
+    InvoiceLine:
+      type: object
+      required: [id, sortOrder, description, quantity, rate, amount, taxPercent, taxAmount]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        invoiceId:
+          type: string
+          format: uuid
+          readOnly: true
+        sortOrder:
+          type: integer
+          readOnly: true
+        description:
+          type: string
+        unit:
+          type: [string, 'null']
+        quantity:
+          $ref: '#/components/schemas/Quantity'
+        rate:
+          $ref: '#/components/schemas/Money'
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: round(quantity x rate, 2).
+        taxPercent:
+          allOf:
+            - $ref: '#/components/schemas/Percent'
+          readOnly: true
+          description: Snapshot of the tax rate percent chosen with `taxRateId` in the input.
+        taxAmount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: round(amount x taxPercent / 100, 2).
+        classificationCode:
+          type: [string, 'null']
+          description: MyInvois classification code of the line.
+    InvoiceLineInput:
+      type: object
+      required: [description, quantity, rate]
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Id of an existing line to keep. Optional.
+        description:
+          type: string
+          minLength: 1
+        unit:
+          type: [string, 'null']
+          maxLength: 30
+        quantity:
+          $ref: '#/components/schemas/Quantity'
+        rate:
+          $ref: '#/components/schemas/Money'
+        taxRateId:
+          type: [string, 'null']
+          format: uuid
+          description: Tax rate of this line. The server stores its percent as `taxPercent`. Null means no tax.
+        classificationCode:
+          type: [string, 'null']
+          maxLength: 10
+    ClaimLine:
+      type: object
+      description: Cumulative progress of one contract item in a progress claim.
+      required: [id, contractItemId, cumulativePercent, cumulativeQuantity, cumulativeAmount, previousAmount, thisClaimAmount]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        invoiceId:
+          type: string
+          format: uuid
+          readOnly: true
+        contractItemId:
+          type: string
+          format: uuid
+        contractItem:
+          allOf:
+            - $ref: '#/components/schemas/ContractItem'
+          readOnly: true
+        cumulativePercent:
+          $ref: '#/components/schemas/Percent'
+        cumulativeQuantity:
+          $ref: '#/components/schemas/Quantity'
+        cumulativeAmount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: round(contract item amount x cumulativePercent / 100, 2).
+        previousAmount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: cumulativeAmount of this item in the previous issued claim.
+        thisClaimAmount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          readOnly: true
+          description: cumulativeAmount - previousAmount.
+        siteReportedPercent:
+          oneOf:
+            - $ref: '#/components/schemas/Percent'
+            - type: 'null'
+          readOnly: true
+          description: Latest percent complete reported from site for this item (hint only), if any.
+    ClaimLineInput:
+      type: object
+      description: >-
+        Send either `cumulativePercent` or `cumulativeQuantity`; the server derives the other.
+        If both are sent `cumulativePercent` wins.
+      required: [contractItemId]
+      anyOf:
+        - required: [cumulativePercent]
+        - required: [cumulativeQuantity]
+      properties:
+        contractItemId:
+          type: string
+          format: uuid
+        cumulativePercent:
+          allOf:
+            - $ref: '#/components/schemas/Percent'
+          description: Cannot be lower than in the previous issued claim and cannot exceed 100.
+        cumulativeQuantity:
+          $ref: '#/components/schemas/Quantity'
+    SimpleInvoiceCreate:
+      type: object
+      required: [type, clientId, lines]
+      properties:
+        type:
+          allOf:
+            - $ref: '#/components/schemas/InvoiceType'
+          description: Must be SIMPLE on this route.
+        clientId:
+          type: string
+          format: uuid
+        projectId:
+          type: [string, 'null']
+          format: uuid
+        issueDate:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+        lines:
+          type: array
+          description: May be empty while drafting. Line order is the array order.
+          items:
+            $ref: '#/components/schemas/InvoiceLineInput'
+    SimpleInvoiceUpdate:
+      type: object
+      description: Full document of a DRAFT invoice of type SIMPLE.
+      additionalProperties: false
+      required: [clientId, lines]
+      properties:
+        clientId:
+          type: string
+          format: uuid
+        projectId:
+          type: [string, 'null']
+          format: uuid
+        issueDate:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+        lines:
+          type: array
+          items:
+            $ref: '#/components/schemas/InvoiceLineInput'
+    ProgressClaimCreate:
+      type: object
+      properties:
+        issueDate:
+          type: [string, 'null']
+          format: date
+        periodFrom:
+          type: [string, 'null']
+          format: date
+        periodTo:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+        taxRateId:
+          type: [string, 'null']
+          format: uuid
+          description: Tax rate applied to the claim subtotal. Defaults to the default tax rate.
+    ProgressClaimUpdate:
+      type: object
+      description: >-
+        Full document of a DRAFT invoice of type PROGRESS_CLAIM. Contract items without a
+        claim line in the body keep the cumulative values of the previous issued claim.
+      additionalProperties: false
+      required: [claimLines]
+      properties:
+        issueDate:
+          type: [string, 'null']
+          format: date
+        periodFrom:
+          type: [string, 'null']
+          format: date
+        periodTo:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+        taxRateId:
+          type: [string, 'null']
+          format: uuid
+        claimLines:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClaimLineInput'
+    RetentionReleaseCreate:
+      type: object
+      required: [amount]
+      properties:
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Retention to release, before tax. Must be positive.
+        issueDate:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+        taxRateId:
+          type: [string, 'null']
+          format: uuid
+          description: Tax rate applied to the amount. Defaults to the default tax rate.
+    RetentionReleaseUpdate:
+      type: object
+      description: Full document of a DRAFT invoice of type RETENTION_RELEASE.
+      additionalProperties: false
+      required: [amount]
+      properties:
+        amount:
+          $ref: '#/components/schemas/Money'
+        issueDate:
+          type: [string, 'null']
+          format: date
+        notes:
+          type: [string, 'null']
+        taxRateId:
+          type: [string, 'null']
+          format: uuid
+    InvoiceVoidRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+    InvoiceList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/InvoiceSummary'
+    CreditNote:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [number, invoiceId, issueDate, reason, subtotal, taxAmount, total, eInvoiceStatus]
+          properties:
+            number:
+              type: string
+              readOnly: true
+              examples: [CN-2026-0001]
+            invoiceId:
+              type: string
+              format: uuid
+              readOnly: true
+            issueDate:
+              type: string
+              format: date
+            reason:
+              type: string
+            subtotal:
+              $ref: '#/components/schemas/Money'
+            taxAmount:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+            total:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+              description: subtotal + taxAmount.
+            eInvoiceStatus:
+              allOf:
+                - $ref: '#/components/schemas/EInvoiceStatus'
+              readOnly: true
+            eInvoiceUuid:
+              type: [string, 'null']
+              readOnly: true
+            eInvoiceLongId:
+              type: [string, 'null']
+              readOnly: true
+            eInvoiceValidatedAt:
+              type: [string, 'null']
+              format: date-time
+              readOnly: true
+            createdById:
+              type: string
+              format: uuid
+              readOnly: true
+    CreditNoteCreate:
+      type: object
+      required: [reason, subtotal]
+      properties:
+        issueDate:
+          type: string
+          format: date
+          description: Defaults to today.
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        subtotal:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Amount credited before tax. Must be positive.
+        taxRateId:
+          type: [string, 'null']
+          format: uuid
+          description: Tax rate used to calculate `taxAmount`. Null means no tax.
+
+    # -------------------------------------------------------------- Payments
+    Payment:
+      allOf:
+        - $ref: '#/components/schemas/BaseEntity'
+        - type: object
+          required: [clientId, receivedDate, method, amount, allocations]
+          properties:
+            clientId:
+              type: string
+              format: uuid
+            client:
+              allOf:
+                - $ref: '#/components/schemas/ClientSummary'
+              readOnly: true
+            receivedDate:
+              type: string
+              format: date
+            method:
+              type: string
+              examples: [BANK_TRANSFER, CHEQUE, CASH]
+            reference:
+              type: [string, 'null']
+            amount:
+              $ref: '#/components/schemas/Money'
+            notes:
+              type: [string, 'null']
+            allocations:
+              type: array
+              items:
+                $ref: '#/components/schemas/PaymentAllocation'
+            unallocatedAmount:
+              allOf:
+                - $ref: '#/components/schemas/Money'
+              readOnly: true
+              description: amount less the sum of allocations.
+            createdById:
+              type: string
+              format: uuid
+              readOnly: true
+    PaymentAllocation:
+      type: object
+      required: [invoiceId, amount]
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        paymentId:
+          type: string
+          format: uuid
+          readOnly: true
+        invoiceId:
+          type: string
+          format: uuid
+        invoiceNumber:
+          type: string
+          readOnly: true
+        amount:
+          $ref: '#/components/schemas/Money'
+    PaymentAllocationInput:
+      type: object
+      required: [invoiceId, amount]
+      properties:
+        invoiceId:
+          type: string
+          format: uuid
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Must be positive.
+    PaymentCreate:
+      type: object
+      required: [clientId, receivedDate, method, amount, allocations]
+      properties:
+        clientId:
+          type: string
+          format: uuid
+        receivedDate:
+          type: string
+          format: date
+        method:
+          type: string
+          minLength: 1
+          maxLength: 30
+          examples: [BANK_TRANSFER, CHEQUE, CASH]
+        reference:
+          type: [string, 'null']
+          maxLength: 100
+        amount:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Must be positive.
+        notes:
+          type: [string, 'null']
+        allocations:
+          type: array
+          description: May be empty. The sum cannot exceed `amount`.
+          items:
+            $ref: '#/components/schemas/PaymentAllocationInput'
+    PaymentList:
+      allOf:
+        - $ref: '#/components/schemas/Page'
+        - type: object
+          properties:
+            items:
+              type: array
+              items:
+                $ref: '#/components/schemas/Payment'
+
+    # -------------------------------------------------------------- Reports
+    DashboardReport:
+      type: object
+      required: [activeProjects, quotationsAwaitingReply, invoicedThisMonth, receivedThisMonth, totalOutstanding, totalRetentionHeld, projectsWithNoReportYesterday]
+      properties:
+        activeProjects:
+          type: integer
+          description: Number of projects with status ACTIVE.
+        quotationsAwaitingReply:
+          type: object
+          description: Latest revisions with status SENT and not expired.
+          required: [count, value]
+          properties:
+            count:
+              type: integer
+            value:
+              $ref: '#/components/schemas/Money'
+        invoicedThisMonth:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Total of invoices issued in the current calendar month, less credit notes.
+        receivedThisMonth:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Total of payments with receivedDate in the current calendar month.
+        totalOutstanding:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Invoice totals less credit notes less amounts paid, over ISSUED and PARTIALLY_PAID invoices.
+        totalRetentionHeld:
+          $ref: '#/components/schemas/Money'
+        projectsWithNoReportYesterday:
+          type: array
+          description: ACTIVE projects with no daily report for yesterday, when yesterday was a working day.
+          items:
+            $ref: '#/components/schemas/ProjectRef'
+    ProjectSummaryReport:
+      type: object
+      required: [project, contractSum, approvedVariations, claimedToDate, paidToDate, outstanding, retentionHeld, percentClaimed, daysWithReports, workingDays, latestPhotos]
+      properties:
+        project:
+          $ref: '#/components/schemas/ProjectRef'
+        contractSum:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Original contract sum.
+        approvedVariations:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Sum of APPROVED variation order totals.
+        claimedToDate:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: grossToDate of the latest issued progress claim.
+        paidToDate:
+          $ref: '#/components/schemas/Money'
+        outstanding:
+          $ref: '#/components/schemas/Money'
+        retentionHeld:
+          $ref: '#/components/schemas/Money'
+        percentClaimed:
+          allOf:
+            - $ref: '#/components/schemas/Percent'
+          description: claimedToDate / (contractSum + approvedVariations) x 100.
+        daysWithReports:
+          type: integer
+          description: Working days in the range that have at least one daily report.
+        workingDays:
+          type: integer
+          description: Working days in the range (`from`..`to`, default project start date to today).
+        latestPhotos:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReportPhoto'
+    ReportPhoto:
+      type: object
+      required: [fileId, url, dailyReportId, reportDate]
+      properties:
+        fileId:
+          type: string
+          format: uuid
+        url:
+          type: string
+          format: uri
+          description: Short-lived presigned download URL.
+        caption:
+          type: [string, 'null']
+        takenAt:
+          type: [string, 'null']
+          format: date-time
+        dailyReportId:
+          type: string
+          format: uuid
+        reportDate:
+          type: string
+          format: date
+    AgeingBuckets:
+      type: object
+      description: Outstanding amounts by days overdue as of the report date.
+      required: [current, days1To30, days31To60, days61To90, days90Plus, total]
+      properties:
+        current:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Not yet due.
+        days1To30:
+          $ref: '#/components/schemas/Money'
+        days31To60:
+          $ref: '#/components/schemas/Money'
+        days61To90:
+          $ref: '#/components/schemas/Money'
+        days90Plus:
+          $ref: '#/components/schemas/Money'
+        total:
+          $ref: '#/components/schemas/Money'
+    ReceivablesAgeingReport:
+      type: object
+      required: [asOf, rows, totals]
+      properties:
+        asOf:
+          type: string
+          format: date
+        rows:
+          type: array
+          description: One row per client with an outstanding balance.
+          items:
+            allOf:
+              - $ref: '#/components/schemas/AgeingBuckets'
+              - type: object
+                required: [client]
+                properties:
+                  client:
+                    $ref: '#/components/schemas/ClientSummary'
+        totals:
+          $ref: '#/components/schemas/AgeingBuckets'
+    PipelineStatusRow:
+      type: object
+      required: [status, count, value]
+      properties:
+        status:
+          $ref: '#/components/schemas/QuotationStatus'
+        count:
+          type: integer
+        value:
+          allOf:
+            - $ref: '#/components/schemas/Money'
+          description: Sum of quotation totals.
+    QuotationPipelineReport:
+      type: object
+      required: [byStatus, winRate, byMonth]
+      properties:
+        from:
+          type: [string, 'null']
+          format: date
+        to:
+          type: [string, 'null']
+          format: date
+        byStatus:
+          type: array
+          items:
+            $ref: '#/components/schemas/PipelineStatusRow'
+        winRate:
+          oneOf:
+            - $ref: '#/components/schemas/Percent'
+            - type: 'null'
+          description: ACCEPTED count / (ACCEPTED + REJECTED + EXPIRED count) x 100. Null when the divisor is 0.
+        byMonth:
+          type: array
+          items:
+            type: object
+            required: [month, byStatus, winRate]
+            properties:
+              month:
+                type: string
+                pattern: '^\d{4}-\d{2}$'
+                examples: ['2026-11']
+              byStatus:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PipelineStatusRow'
+              winRate:
+                oneOf:
+                  - $ref: '#/components/schemas/Percent'
+                  - type: 'null'
+    BillingCollectionsReport:
+      type: object
+      required: [months, totals]
+      properties:
+        months:
+          type: array
+          description: One row per calendar month in the range, oldest first (12 months by default).
+          items:
+            type: object
+            required: [month, invoiced, received]
+            properties:
+              month:
+                type: string
+                pattern: '^\d{4}-\d{2}$'
+                examples: ['2026-11']
+              invoiced:
+                allOf:
+                  - $ref: '#/components/schemas/Money'
+                description: Total of invoices issued in the month, less credit notes.
+              received:
+                allOf:
+                  - $ref: '#/components/schemas/Money'
+                description: Total of payments received in the month.
+        totals:
+          type: object
+          required: [invoiced, received]
+          properties:
+            invoiced:
+              $ref: '#/components/schemas/Money'
+            received:
+              $ref: '#/components/schemas/Money'
+    RetentionRegisterReport:
+      type: object
+      required: [rows, totals]
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+            required: [project, client, held, released, balance, expectedReleases]
+            properties:
+              project:
+                $ref: '#/components/schemas/ProjectRef'
+              client:
+                $ref: '#/components/schemas/ClientSummary'
+              held:
+                allOf:
+                  - $ref: '#/components/schemas/Money'
+                description: retentionToDate of the latest issued progress claim.
+              released:
+                allOf:
+                  - $ref: '#/components/schemas/Money'
+                description: Sum of issued RETENTION_RELEASE invoices.
+              balance:
+                allOf:
+                  - $ref: '#/components/schemas/Money'
+                description: held - released.
+              expectedReleases:
+                type: array
+                description: >-
+                  Expected release dates derived from the project end date and
+                  `defectsLiabilityMonths`. Empty when the project has no end date.
+                items:
+                  type: object
+                  required: [date, amount, milestone]
+                  properties:
+                    date:
+                      type: string
+                      format: date
+                    amount:
+                      $ref: '#/components/schemas/Money'
+                    milestone:
+                      type: string
+                      enum: [PRACTICAL_COMPLETION, END_OF_DEFECTS_LIABILITY]
+        totals:
+          type: object
+          required: [held, released, balance]
+          properties:
+            held:
+              $ref: '#/components/schemas/Money'
+            released:
+              $ref: '#/components/schemas/Money'
+            balance:
+              $ref: '#/components/schemas/Money'
+    DailyReportComplianceReport:
+      type: object
+      required: [from, to, byProject, bySiteStaff]
+      properties:
+        from:
+          type: string
+          format: date
+        to:
+          type: string
+          format: date
+        byProject:
+          type: array
+          items:
+            type: object
+            required: [project, expected, submitted, compliancePercent]
+            properties:
+              project:
+                $ref: '#/components/schemas/ProjectRef'
+              expected:
+                type: integer
+                description: Working days in the range while the project was ACTIVE.
+              submitted:
+                type: integer
+                description: Working days in the range with at least one report.
+              compliancePercent:
+                $ref: '#/components/schemas/Percent'
+        bySiteStaff:
+          type: array
+          description: One row per SITE_STAFF member per project.
+          items:
+            type: object
+            required: [user, project, expected, submitted, compliancePercent]
+            properties:
+              user:
+                $ref: '#/components/schemas/UserSummary'
+              project:
+                $ref: '#/components/schemas/ProjectRef'
+              expected:
+                type: integer
+              submitted:
+                type: integer
+              compliancePercent:
+                $ref: '#/components/schemas/Percent'
+

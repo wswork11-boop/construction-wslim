@@ -38,6 +38,7 @@ in Requirements before Design, and Design before Tasks.
 | [specs/04-invoicing/spec.md](specs/04-invoicing/spec.md) | Invoices, progress claims, retention, payments |
 | [specs/05-reports/spec.md](specs/05-reports/spec.md) | Dashboard and reports |
 | [specs/06-myinvois/spec.md](specs/06-myinvois/spec.md) | LHDN e-invoice |
+| [specs/07-expenses/spec.md](specs/07-expenses/spec.md) | Project & company expenses (job costing) |
 
 ## Design files
 
@@ -61,12 +62,13 @@ examples only.
 
 | Spec | Status |
 |---|---|
-| 01 Foundation | Not started |
-| 02 Quotations | Not started |
-| 03 Daily reports | Not started |
-| 04 Invoicing | Not started - needs accountant review of retention and SST rules |
-| 05 Reports | Draft |
+| 01 Foundation | Done |
+| 02 Quotations | Done |
+| 03 Daily reports | Done |
+| 04 Invoicing | Done |
+| 05 Reports | Done |
 | 06 MyInvois | Draft - LHDN rules to be verified |
+| 07 Expenses | Done |
 
 ## Next step
 

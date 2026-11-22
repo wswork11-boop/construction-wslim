@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Office web app - mockup</title>
+<link rel="stylesheet" href="mockup.css">
+</head>
+<body>
+<div class="app">
+  <nav class="side">
+    <div class="logo">Construction System</div>
+    <a data-s="dashboard" class="on">Dashboard</a>
+    <div class="grp">Work</div>
+    <a data-s="projects">Projects</a>
+    <a data-s="project">&nbsp;&nbsp;Project detail</a>
+    <a data-s="reports">Daily reports</a>
+    <div class="grp">Sales</div>
+    <a data-s="quotations">Quotations</a>
+    <a data-s="quotation">&nbsp;&nbsp;Quotation editor</a>
+    <div class="grp">Billing</div>
+    <a data-s="invoices">Invoices</a>
+    <a data-s="claim">&nbsp;&nbsp;Progress claim</a>
+    <a data-s="payment">&nbsp;&nbsp;Record payment</a>
+    <div class="grp">Setup</div>
+    <a data-s="clients">Clients</a>
+    <a data-s="users">Users</a>
+    <a data-s="settings">Company settings</a>
+  </nav>
+
+  <main class="main">
+    <div class="note">Static mockup with sample data. Use the left menu to move between screens; buttons and inputs do nothing. Company, client and project names are made up.</div>
+
+    <!-- DASHBOARD -->
+    <section class="screen on" id="dashboard">
+      <div class="top"><h1>Dashboard</h1><span class="sp"></span><span class="muted">November 2026</span></div>
+      <div class="grid g4">
+        <div class="card stat"><div class="l">Active projects</div><div class="v">7</div></div>
+        <div class="card stat"><div class="l">Quotations awaiting reply</div><div class="v">4 <span class="small muted">RM 612,400</span></div></div>
+        <div class="card stat"><div class="l">Invoiced this month</div><div class="v">RM 184,650</div></div>
+        <div class="card stat"><div class="l">Received this month</div><div class="v">RM 121,300</div></div>
+      </div>
+      <div class="grid g2">
+        <div class="card"><h2>Outstanding by age</h2>
+          <table>
+            <tr><th>Client</th><th class="num">Current</th><th class="num">1-30</th><th class="num">31-60</th><th class="num">60+</th></tr>
+            <tr><td>Syarikat ABC Sdn Bhd</td><td class="num">68,211.00</td><td class="num">-</td><td class="num">-</td><td class="num">-</td></tr>
+            <tr><td>Maju Properties Sdn Bhd</td><td class="num">42,000.00</td><td class="num">31,800.00</td><td class="num">-</td><td class="num">-</td></tr>
+            <tr><td>Encik Rahman</td><td class="num">-</td><td class="num"><span class="pill bad">12,500.00</span></td><td class="num">-</td><td class="num">-</td></tr>
+            <tr class="tot"><td>Total RM 154,511.00</td><td class="num">110,211.00</td><td class="num">44,300.00</td><td class="num">-</td><td class="num">-</td></tr>
+          </table>
+        </div>
+        <div class="card"><h2>No daily report yesterday</h2>
+          <table>
+            <tr><th>Project</th><th>Site staff</th><th>Last report</th></tr>
+            <tr><td>P-2026-005 Taman Indah bungalow</td><td>Kumar</td><td><span class="pill bad">3 days ago</span></td></tr>
+            <tr><td>P-2026-007 Warehouse roofing</td><td>Ah Seng</td><td><span class="pill warn">2 days ago</span></td></tr>
+          </table>
+          <h2 style="margin-top:16px">Retention held</h2>
+          <div class="kv"><span>Across 5 projects</span><span class="bold">RM 48,920.00</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PROJECTS -->
+    <section class="screen" id="projects">
+      <div class="top"><h1>Projects</h1><span class="sp"></span><input style="width:220px" placeholder="Search code, name, client"><select style="width:130px"><option>Active</option><option>All</option></select><button class="btn pri">New project</button></div>
+      <div class="card">
+        <table>
+          <tr><th>Code</th><th>Project</th><th>Client</th><th>Status</th><th class="num">Contract sum (RM)</th><th style="width:150px">Claimed</th><th>Last site report</th></tr>
+          <tr><td><a data-s="project">P-2026-003</a></td><td>Shoplot renovation, Jalan Bunga</td><td>Syarikat ABC Sdn Bhd</td><td><span class="pill ok">Active</span></td><td class="num">362,000.00</td><td><div class="bar"><i style="width:45%"></i></div><span class="small muted">45%</span></td><td>Yesterday</td></tr>
+          <tr><td>P-2026-005</td><td>Taman Indah bungalow</td><td>Encik Rahman</td><td><span class="pill ok">Active</span></td><td class="num">890,000.00</td><td><div class="bar"><i style="width:22%"></i></div><span class="small muted">22%</span></td><td><span class="pill bad">3 days ago</span></td></tr>
+          <tr><td>P-2026-006</td><td>Office fit-out, Menara Satu L12</td><td>Maju Properties Sdn Bhd</td><td><span class="pill ok">Active</span></td><td class="num">245,500.00</td><td><div class="bar"><i style="width:78%"></i></div><span class="small muted">78%</span></td><td>Yesterday</td></tr>
+          <tr><td>P-2026-007</td><td>Warehouse roofing</td><td>Maju Properties Sdn Bhd</td><td><span class="pill warn">On hold</span></td><td class="num">128,000.00</td><td><div class="bar"><i style="width:10%"></i></div><span class="small muted">10%</span></td><td><span class="pill warn">2 days ago</span></td></tr>
+          <tr><td>P-2026-008</td><td>Clinic renovation</td><td>Klinik Sihat</td><td><span class="pill">Draft</span></td><td class="num">-</td><td>-</td><td>-</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- PROJECT DETAIL -->
+    <section class="screen" id="project">
+      <div class="top"><div><h1>P-2026-003 Shoplot renovation, Jalan Bunga</h1><span class="muted">Syarikat ABC Sdn Bhd &middot; 12 Jalan Bunga, 47000 Sungai Buloh</span></div><span class="sp"></span><span class="pill ok">Active</span><button class="btn">Edit</button></div>
+      <div class="tabs"><span class="on">Summary</span><span>Contract</span><span>Variation orders (1)</span><span>Claims &amp; invoices (3)</span><span>Daily reports</span><span>Team (4)</span></div>
+      <div class="grid g4">
+        <div class="card stat"><div class="l">Current contract sum</div><div class="v">RM 362,000</div><div class="small muted">350,000 + VO 12,000</div></div>
+        <div class="card stat"><div class="l">Work done to date</div><div class="v">RM 163,000</div><div class="bar"><i style="width:45%"></i></div></div>
+        <div class="card stat"><div class="l">Retention held</div><div class="v">RM 16,300</div><div class="small muted">cap RM 18,100</div></div>
+        <div class="card stat"><div class="l">Outstanding</div><div class="v">RM 68,211</div><div class="small muted">Claim 3, due 14 Dec</div></div>
+      </div>
+      <div class="grid g2">
+        <div class="card"><h2>Contract progress</h2>
+          <table>
+            <tr><th>Section</th><th class="num">Amount (RM)</th><th class="num">Claimed</th><th class="num">Site says</th></tr>
+            <tr><td>A Preliminaries</td><td class="num">18,000.00</td><td class="num">100%</td><td class="num">100%</td></tr>
+            <tr><td>B Demolition &amp; site clearing</td><td class="num">24,500.00</td><td class="num">100%</td><td class="num">100%</td></tr>
+            <tr><td>C Structural works</td><td class="num">96,000.00</td><td class="num">80%</td><td class="num">85%</td></tr>
+            <tr><td>D Brickwork &amp; plastering</td><td class="num">58,000.00</td><td class="num">40%</td><td class="num">50%</td></tr>
+            <tr><td>E M&amp;E works</td><td class="num">72,500.00</td><td class="num">20%</td><td class="num">20%</td></tr>
+            <tr><td>F Finishes</td><td class="num">81,000.00</td><td class="num">0%</td><td class="num">0%</td></tr>
+            <tr><td>VO-01 Additional partition wall</td><td class="num">12,000.00</td><td class="num">50%</td><td class="num">60%</td></tr>
+          </table>
+        </div>
+        <div class="card"><h2>Latest site photos <a class="small" data-s="reports">View reports</a></h2>
+          <div class="grid g3"><div class="ph">16 Nov - L1 columns</div><div class="ph">16 Nov - brickwall</div><div class="ph">15 Nov - conduit</div><div class="ph">15 Nov - staircase</div><div class="ph">14 Nov - rebar</div><div class="ph">14 Nov - delivery</div></div>
+          <p class="small muted">Reports submitted: 38 of 41 working days</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DAILY REPORTS -->
+    <section class="screen" id="reports">
+      <div class="top"><h1>Daily reports</h1><span class="sp"></span><select style="width:280px"><option>P-2026-003 Shoplot renovation, Jalan Bunga</option></select><button class="btn">Site report PDF</button></div>
+      <div class="split" style="grid-template-columns:340px 1fr">
+        <div class="card"><h2>November 2026</h2>
+          <div class="cal">
+            <div class="h">M</div><div class="h">T</div><div class="h">W</div><div class="h">T</div><div class="h">F</div><div class="h">S</div><div class="h">S</div>
+            <div class="o"></div><div class="o"></div><div class="o"></div><div class="o"></div><div class="o"></div><div class="o"></div><div class="o">1</div>
+            <div class="y">2</div><div class="y">3</div><div class="y">4</div><div class="y">5</div><div class="y">6</div><div class="y">7</div><div class="o">8</div>
+            <div class="y">9</div><div class="x">10</div><div class="y">11</div><div class="y">12</div><div class="y">13</div><div class="y">14</div><div class="o">15</div>
+            <div class="y bold">16</div><div>17</div><div>18</div><div>19</div><div>20</div><div>21</div><div class="o">22</div>
+          </div>
+          <p class="small muted">Green: report received. Red: missing. Grey: non-working day.</p>
+        </div>
+        <div class="card">
+          <div class="top" style="margin-bottom:8px"><h2 style="margin:0">Monday 16 Nov 2026</h2><span class="pill warn">Not reviewed</span><span class="sp"></span><button class="btn pri sm">Mark reviewed</button></div>
+          <p class="small muted">Submitted by Kumar at 5:42 pm &middot; Cloudy &middot; GPS 3.2101, 101.5632 (on site)</p>
+          <div class="grid g2">
+            <div><h3>Work done</h3><p>Completed formwork and casting for L1 columns grid C-D. Brickwall at rear shop reached lintel level. Electrical conduit laid in ground-floor slab.</p>
+              <h3>Issues / delays</h3><p>Sand delivery arrived 2 hours late; plastering team idle in the morning.</p>
+              <h3>Plan for tomorrow</h3><p>Strip column formwork grid A-B. Continue brickwall front shop.</p></div>
+            <div><h3>Manpower</h3>
+              <table><tr><th>Trade</th><th class="num">Headcount</th></tr><tr><td>Carpenter</td><td class="num">4</td></tr><tr><td>Bricklayer</td><td class="num">5</td></tr><tr><td>Electrician</td><td class="num">2</td></tr><tr><td>General worker</td><td class="num">6</td></tr><tr class="tot"><td>Total</td><td class="num">17</td></tr></table></div>
+          </div>
+          <h3 style="margin-top:10px">Photos (6)</h3>
+          <div class="grid g4"><div class="ph">L1 columns C-D</div><div class="ph">Rear brickwall</div><div class="ph">Slab conduit</div><div class="ph">Sand delivery</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- QUOTATIONS -->
+    <section class="screen" id="quotations">
+      <div class="top"><h1>Quotations</h1><span class="sp"></span><input style="width:220px" placeholder="Search number, client, title"><select style="width:130px"><option>All statuses</option></select><button class="btn pri">New quotation</button></div>
+      <div class="card">
+        <table>
+          <tr><th>Number</th><th>Client</th><th>Title</th><th>Date</th><th>Valid until</th><th class="num">Total (RM)</th><th>Status</th></tr>
+          <tr><td><a data-s="quotation">QT-2026-0021</a></td><td>Klinik Sihat</td><td>Clinic renovation</td><td>12 Nov 2026</td><td>12 Dec 2026</td><td class="num">148,400.00</td><td><span class="pill">Draft</span></td></tr>
+          <tr><td>QT-2026-0020 Rev 1</td><td>Maju Properties Sdn Bhd</td><td>Car park resurfacing</td><td>08 Nov 2026</td><td>08 Dec 2026</td><td class="num">96,500.00</td><td><span class="pill info">Sent</span></td></tr>
+          <tr><td>QT-2026-0019</td><td>Encik Lim</td><td>Kitchen extension</td><td>02 Nov 2026</td><td>02 Dec 2026</td><td class="num">54,200.00</td><td><span class="pill info">Sent</span></td></tr>
+          <tr><td>QT-2026-0014 Rev 2</td><td>Syarikat ABC Sdn Bhd</td><td>Shoplot renovation, Jalan Bunga</td><td>20 Aug 2026</td><td>19 Sep 2026</td><td class="num">371,000.00</td><td><span class="pill ok">Accepted</span></td></tr>
+          <tr><td>QT-2026-0012</td><td>Puan Aminah</td><td>Roof repair</td><td>01 Aug 2026</td><td>31 Aug 2026</td><td class="num">18,900.00</td><td><span class="pill bad">Rejected</span></td></tr>
+          <tr><td>QT-2026-0011</td><td>Encik Tan</td><td>Shop signage structure</td><td>28 Jul 2026</td><td>27 Aug 2026</td><td class="num">9,800.00</td><td><span class="pill warn">Expired</span></td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- QUOTATION EDITOR -->
+    <section class="screen" id="quotation">
+      <div class="top"><div><h1>QT-2026-0021 <span class="pill">Draft</span></h1></div><span class="sp"></span><button class="btn">Duplicate</button><button class="btn">Preview PDF</button><button class="btn">Save draft</button><button class="btn pri">Send</button></div>
+      <div class="split">
+        <div>
+          <div class="card grid g3" style="gap:10px">
+            <div><label>Client</label><select><option>Klinik Sihat</option></select></div>
+            <div><label>Issue date</label><input value="12 Nov 2026"></div>
+            <div><label>Valid until</label><input value="12 Dec 2026"></div>
+            <div style="grid-column:1/-1"><label>Title</label><input value="Clinic renovation at Lot 8, Jalan Sihat"></div>
+          </div>
+          <div class="card">
+            <table>
+              <tr><th style="width:26px"></th><th>Description</th><th style="width:70px">Unit</th><th style="width:90px" class="num">Qty</th><th style="width:110px" class="num">Rate (RM)</th><th style="width:120px" class="num">Amount (RM)</th><th style="width:26px"></th></tr>
+              <tr class="sec"><td>&#8942;</td><td colspan="4"><input value="A. Demolition"></td><td class="num">12,400.00</td><td>&times;</td></tr>
+              <tr><td class="muted">&#8942;</td><td><input value="Remove existing partitions and ceiling"></td><td><input value="m2"></td><td><input class="n" value="180.000"></td><td><input class="n" value="40.00"></td><td class="num">7,200.00</td><td class="muted">&times;</td></tr>
+              <tr><td class="muted">&#8942;</td><td><input value="Debris disposal"></td><td><input value="trip"></td><td><input class="n" value="8.000"></td><td><input class="n" value="650.00"></td><td class="num">5,200.00</td><td class="muted">&times;</td></tr>
+              <tr><td></td><td colspan="6"><a class="small">+ Add item</a></td></tr>
+              <tr class="sec"><td>&#8942;</td><td colspan="4"><input value="B. Partition and ceiling"></td><td class="num">61,600.00</td><td>&times;</td></tr>
+              <tr><td class="muted">&#8942;</td><td><input value="Drywall partition, 75mm stud, both sides"></td><td><input value="m2"></td><td><input class="n" value="320.000"></td><td><input class="n" value="130.00"></td><td class="num">41,600.00</td><td class="muted">&times;</td></tr>
+              <tr><td class="muted">&#8942;</td><td><input value="Suspended ceiling, 600x600 mineral fibre"></td><td><input value="m2"></td><td><input class="n" value="250.000"></td><td><input class="n" value="80.00"></td><td class="num">20,000.00</td><td class="muted">&times;</td></tr>
+              <tr><td></td><td colspan="6"><a class="small">+ Add item</a></td></tr>
+              <tr class="sec"><td>&#8942;</td><td colspan="4"><input value="C. Electrical and plumbing"></td><td class="num">66,000.00</td><td>&times;</td></tr>
+              <tr><td class="muted">&#8942;</td><td><input value="Electrical wiring, DB and fittings"></td><td><input value="LS"></td><td><input class="n" value="1.000"></td><td><input class="n" value="38,000.00"></td><td class="num">38,000.00</td><td class="muted">&times;</td></tr>
+              <tr><td class="muted">&#8942;</td><td><input value="Plumbing and sanitary, 4 treatment rooms"></td><td><input value="LS"></td><td><input class="n" value="1.000"></td><td><input class="n" value="28,000.00"></td><td class="num">28,000.00</td><td class="muted">&times;</td></tr>
+              <tr><td></td><td colspan="6"><a class="small">+ Add item</a> &nbsp; <a class="small">+ Add section</a></td></tr>
+            </table>
+          </div>
+          <div class="card"><label>Terms and conditions</label><textarea rows="3">1. Payment by progress claim, 30 days from invoice date.
+2. 10% retention, limit 5% of contract sum.
+3. Prices exclude authority submission fees.</textarea></div>
+        </div>
+        <div class="card" style="position:sticky;top:14px"><h2>Totals</h2>
+          <div class="kv"><span>Subtotal</span><span class="num">140,000.00</span></div>
+          <div class="kv"><span>Discount</span><span style="width:110px"><input class="n" value="0.00"></span></div>
+          <div class="kv"><span>Tax</span><span style="width:110px"><select><option>SST 6%</option><option>No tax</option></select></span></div>
+          <div class="kv"><span class="muted">Tax amount</span><span class="num">8,400.00</span></div>
+          <div class="kv big"><span>Total (RM)</span><span class="num">148,400.00</span></div>
+          <p class="small muted">Totals update as you type. The server recalculates on save.</p>
+          <h2 style="margin-top:14px">Revisions</h2><p class="small muted">Rev 0 (this draft)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVOICES -->
+    <section class="screen" id="invoices">
+      <div class="top"><h1>Invoices</h1><span class="sp"></span><input style="width:200px" placeholder="Search"><select style="width:150px"><option>Unpaid</option><option>All</option></select><button class="btn">Export Excel</button><button class="btn">New progress claim</button><button class="btn pri">New invoice</button></div>
+      <div class="card">
+        <table>
+          <tr><th>Number</th><th>Type</th><th>Client / project</th><th>Issued</th><th>Due</th><th class="num">Total (RM)</th><th class="num">Balance (RM)</th><th>Status</th><th>e-Invoice</th></tr>
+          <tr><td>-</td><td>Claim 4</td><td>Maju Properties &middot; P-2026-006</td><td>-</td><td>-</td><td class="num">38,160.00</td><td class="num">-</td><td><span class="pill">Draft</span></td><td>-</td></tr>
+          <tr><td><a data-s="claim">PC-2026-0031</a></td><td>Claim 3</td><td>Syarikat ABC &middot; P-2026-003</td><td>14 Nov 2026</td><td>14 Dec 2026</td><td class="num">68,211.00</td><td class="num">68,211.00</td><td><span class="pill info">Issued</span></td><td><span class="pill ok">Valid</span></td></tr>
+          <tr><td>PC-2026-0029</td><td>Claim 2</td><td>Maju Properties &middot; P-2026-007</td><td>02 Nov 2026</td><td>02 Dec 2026</td><td class="num">42,000.00</td><td class="num">42,000.00</td><td><span class="pill info">Issued</span></td><td><span class="pill ok">Valid</span></td></tr>
+          <tr><td>PC-2026-0026</td><td>Claim 3</td><td>Maju Properties &middot; P-2026-006</td><td>10 Oct 2026</td><td>09 Nov 2026</td><td class="num">61,800.00</td><td class="num"><span class="pill warn">31,800.00</span></td><td><span class="pill warn">Part paid</span></td><td><span class="pill ok">Valid</span></td></tr>
+          <tr><td>INV-2026-0044</td><td>Invoice</td><td>Encik Rahman</td><td>18 Sep 2026</td><td>18 Oct 2026</td><td class="num">12,500.00</td><td class="num"><span class="pill bad">12,500.00</span></td><td><span class="pill bad">Overdue 30 d</span></td><td><span class="pill ok">Valid</span></td></tr>
+          <tr><td>PC-2026-0022</td><td>Claim 2</td><td>Syarikat ABC &middot; P-2026-003</td><td>12 Oct 2026</td><td>11 Nov 2026</td><td class="num">46,746.00</td><td class="num">0.00</td><td><span class="pill ok">Paid</span></td><td><span class="pill ok">Valid</span></td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- PROGRESS CLAIM -->
+    <section class="screen" id="claim">
+      <div class="top"><div><h1>Progress claim 3 <span class="pill">Draft view</span></h1><span class="muted">P-2026-003 Shoplot renovation &middot; Syarikat ABC Sdn Bhd</span></div><span class="sp"></span><button class="btn">Preview PDF</button><button class="btn">Save draft</button><button class="btn pri">Issue claim</button></div>
+      <div class="split">
+        <div class="card">
+          <div class="grid g3" style="gap:10px;margin-bottom:12px"><div><label>Work done from</label><input value="13 Oct 2026"></div><div><label>to</label><input value="13 Nov 2026"></div><div><label>Claim date</label><input value="14 Nov 2026"></div></div>
+          <table>
+            <tr><th>Item</th><th class="num">Contract (RM)</th><th class="num">Previous %</th><th class="num">Site says</th><th style="width:80px" class="num">To date %</th><th class="num">To date (RM)</th><th class="num">This claim (RM)</th></tr>
+            <tr><td>A Preliminaries</td><td class="num">18,000.00</td><td class="num">100</td><td class="num muted">100</td><td><input class="n" value="100" disabled></td><td class="num">18,000.00</td><td class="num">-</td></tr>
+            <tr><td>B Demolition &amp; site clearing</td><td class="num">24,500.00</td><td class="num">100</td><td class="num muted">100</td><td><input class="n" value="100" disabled></td><td class="num">24,500.00</td><td class="num">-</td></tr>
+            <tr><td>C Structural works</td><td class="num">96,000.00</td><td class="num">45</td><td class="num muted">85</td><td><input class="n" value="80"></td><td class="num">76,800.00</td><td class="num">33,600.00</td></tr>
+            <tr><td>D Brickwork &amp; plastering</td><td class="num">58,000.00</td><td class="num">10</td><td class="num muted">50</td><td><input class="n" value="40"></td><td class="num">23,200.00</td><td class="num">17,400.00</td></tr>
+            <tr><td>E M&amp;E works</td><td class="num">72,500.00</td><td class="num">0</td><td class="num muted">20</td><td><input class="n" value="20"></td><td class="num">14,500.00</td><td class="num">14,500.00</td></tr>
+            <tr><td>F Finishes</td><td class="num">81,000.00</td><td class="num">0</td><td class="num muted">0</td><td><input class="n" value="0"></td><td class="num">-</td><td class="num">-</td></tr>
+            <tr class="sec"><td colspan="7">Variation orders</td></tr>
+            <tr><td>VO-01 Additional partition wall</td><td class="num">12,000.00</td><td class="num">0</td><td class="num muted">60</td><td><input class="n" value="50"></td><td class="num">6,000.00</td><td class="num">6,000.00</td></tr>
+            <tr class="tot"><td>Total</td><td class="num">362,000.00</td><td></td><td></td><td class="num">45.0</td><td class="num">163,000.00</td><td class="num">71,500.00</td></tr>
+          </table>
+          <p class="small muted">"Site says" is the latest percentage reported from the mobile app, shown as a guide only. Sections are shown here; the real screen expands to individual items.</p>
+        </div>
+        <div class="card" style="position:sticky;top:14px"><h2>This claim</h2>
+          <div class="kv"><span>Work done to date</span><span class="num">163,000.00</span></div>
+          <div class="kv"><span>Less retention 10%</span><span class="num">(16,300.00)</span></div>
+          <div class="kv small muted"><span>Retention limit (5%)</span><span class="num">18,100.00</span></div>
+          <div class="kv"><span>Net to date</span><span class="num">146,700.00</span></div>
+          <div class="kv"><span>Less previously claimed</span><span class="num">(82,350.00)</span></div>
+          <div class="kv bold"><span>Amount this claim</span><span class="num">64,350.00</span></div>
+          <div class="kv"><span>SST 6%</span><span class="num">3,861.00</span></div>
+          <div class="kv big"><span>Amount due (RM)</span><span class="num">68,211.00</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAYMENT -->
+    <section class="screen" id="payment">
+      <div class="top"><h1>Record payment</h1></div>
+      <div class="card" style="max-width:820px">
+        <div class="grid g4" style="gap:10px">
+          <div><label>Client</label><select><option>Maju Properties Sdn Bhd</option></select></div>
+          <div><label>Date received</label><input value="17 Nov 2026"></div>
+          <div><label>Method</label><select><option>Bank transfer</option><option>Cheque</option><option>Cash</option></select></div>
+          <div><label>Amount (RM)</label><input class="n" value="50,000.00"></div>
+          <div style="grid-column:1/-1"><label>Reference</label><input value="IBG 20261117-88213"></div>
+        </div>
+        <h2 style="margin-top:14px">Apply to invoices</h2>
+        <table>
+          <tr><th>Invoice</th><th>Due</th><th class="num">Balance (RM)</th><th style="width:140px" class="num">Apply (RM)</th></tr>
+          <tr><td>PC-2026-0026 &middot; P-2026-006 Claim 3</td><td><span class="pill warn">09 Nov 2026</span></td><td class="num">31,800.00</td><td><input class="n" value="31,800.00"></td></tr>
+          <tr><td>PC-2026-0029 &middot; P-2026-007 Claim 2</td><td>02 Dec 2026</td><td class="num">42,000.00</td><td><input class="n" value="18,200.00"></td></tr>
+          <tr class="tot"><td colspan="3">Applied 50,000.00 of 50,000.00</td><td class="num"><span class="pill ok">Fully applied</span></td></tr>
+        </table>
+        <p class="right" style="margin:14px 0 0"><button class="btn">Cancel</button> <button class="btn pri">Save payment</button></p>
+      </div>
+    </section>
+
+    <!-- CLIENTS -->
+    <section class="screen" id="clients">
+      <div class="top"><h1>Clients</h1><span class="sp"></span><input style="width:220px" placeholder="Search"><button class="btn pri">New client</button></div>
+      <div class="card">
+        <table>
+          <tr><th>Name</th><th>Registration no.</th><th>TIN</th><th>Contact</th><th>Phone</th><th class="num">Projects</th><th class="num">Outstanding (RM)</th></tr>
+          <tr><td>Syarikat ABC Sdn Bhd</td><td>202001012345</td><td>C1234567890</td><td>Puan Siti</td><td>012-000 0001</td><td class="num">1</td><td class="num">68,211.00</td></tr>
+          <tr><td>Maju Properties Sdn Bhd</td><td>201501054321</td><td>C9876543210</td><td>Mr Wong</td><td>012-000 0002</td><td class="num">2</td><td class="num">73,800.00</td></tr>
+          <tr><td>Encik Rahman</td><td>-</td><td><span class="pill warn">Missing</span></td><td>Encik Rahman</td><td>012-000 0003</td><td class="num">1</td><td class="num">12,500.00</td></tr>
+          <tr><td>Klinik Sihat</td><td>202203067890</td><td>C5556667770</td><td>Dr Lee</td><td>012-000 0004</td><td class="num">0</td><td class="num">-</td></tr>
+        </table>
+        <p class="small muted">"Missing" TIN is flagged because it will be needed for e-invoicing.</p>
+      </div>
+    </section>
+
+    <!-- USERS -->
+    <section class="screen" id="users">
+      <div class="top"><h1>Users</h1><span class="sp"></span><button class="btn pri">New user</button></div>
+      <div class="card">
+        <table>
+          <tr><th>Name</th><th>Email</th><th>Phone</th><th>Role</th><th>Projects</th><th>Status</th><th></th></tr>
+          <tr><td>Owner</td><td>owner@example.com</td><td>012-000 0010</td><td><span class="pill info">Owner</span></td><td>All</td><td><span class="pill ok">Active</span></td><td><a>Edit</a></td></tr>
+          <tr><td>Mei Ling</td><td>meiling@example.com</td><td>012-000 0011</td><td><span class="pill">Office</span></td><td>All</td><td><span class="pill ok">Active</span></td><td><a>Edit</a></td></tr>
+          <tr><td>Faizal</td><td>faizal@example.com</td><td>012-000 0012</td><td><span class="pill">Project manager</span></td><td>P-2026-003, P-2026-005</td><td><span class="pill ok">Active</span></td><td><a>Edit</a></td></tr>
+          <tr><td>Kumar</td><td>kumar@example.com</td><td>012-000 0013</td><td><span class="pill">Site staff</span></td><td>P-2026-003, P-2026-005</td><td><span class="pill ok">Active</span></td><td><a>Edit</a></td></tr>
+          <tr><td>Ah Seng</td><td>ahseng@example.com</td><td>012-000 0014</td><td><span class="pill">Site staff</span></td><td>P-2026-007</td><td><span class="pill">Deactivated</span></td><td><a>Edit</a></td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="screen" id="settings">
+      <div class="top"><h1>Company settings</h1><span class="sp"></span><button class="btn pri">Save</button></div>
+      <div class="grid g2">
+        <div class="card"><h2>Company details (shown on documents)</h2>
+          <div class="field"><label>Company name</label><input value="Contoh Bina Sdn Bhd"></div>
+          <div class="grid g2" style="gap:10px"><div class="field"><label>SSM registration no.</label><input value="201901000001"></div><div class="field"><label>TIN</label><input value="C0000000001"></div><div class="field"><label>SST registration no.</label><input value=""></div><div class="field"><label>MSIC code</label><input value=""></div></div>
+          <div class="field"><label>Address</label><textarea rows="2">1 Jalan Contoh, 47000 Sungai Buloh, Selangor</textarea></div>
+          <div class="field"><label>Bank details (printed on invoices)</label><textarea rows="2">Bank name, account name, account number</textarea></div>
+          <div class="field"><label>Logo</label><button class="btn sm">Upload</button></div>
+        </div>
+        <div>
+          <div class="card"><h2>Defaults for new projects</h2>
+            <div class="grid g3" style="gap:10px"><div><label>Payment term (days)</label><input class="n" value="30"></div><div><label>Retention %</label><input class="n" value="10.00"></div><div><label>Retention limit %</label><input class="n" value="5.00"></div></div>
+          </div>
+          <div class="card"><h2>Tax rates</h2>
+            <table><tr><th>Name</th><th class="num">Percent</th><th>Default</th><th>Active</th></tr><tr><td>SST 6%</td><td class="num">6.00</td><td>Yes</td><td>Yes</td></tr><tr><td>No tax</td><td class="num">0.00</td><td>-</td><td>Yes</td></tr></table>
+            <p class="small muted">Sample rates only. Confirm the correct rate with your accountant.</p>
+          </div>
+          <div class="card"><h2>E-invoice (MyInvois)</h2><p class="muted">Off. Turn on and enter credentials once spec 06 is built.</p></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+<script>
+  // Screen switching for the mockup only.
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-s]');
+    if (!a) return;
+    var id = a.getAttribute('data-s');
+    document.querySelectorAll('.screen').forEach(function (s) { s.classList.toggle('on', s.id === id); });
+    document.querySelectorAll('.side a').forEach(function (n) { n.classList.toggle('on', n.getAttribute('data-s') === id); });
+    window.scrollTo(0, 0);
+  });
+</script>
+</body>
+</html>
+

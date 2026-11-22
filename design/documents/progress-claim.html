@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Progress claim layout</title>
+<link rel="stylesheet" href="document.css">
+</head>
+<body>
+<div class="hint">Proposed progress claim / invoice layout with sample data (claim 3 of the same project as the quotation sample). The tax rate and retention terms are examples to confirm with your accountant. The QR box is filled only after MyInvois validation.</div>
+<div class="page">
+  <div class="head">
+    <div class="co"><div class="logo">LOGO</div><div><b>Contoh Bina Sdn Bhd</b><br>Reg. No. 201901000001 &middot; TIN C0000000001<br>1 Jalan Contoh, 47000 Sungai Buloh, Selangor<br>Tel 03-0000 0000 &middot; office@example.com</div></div>
+    <div class="title"><h1>PROGRESS CLAIM</h1><div><b>PC-2026-0031</b> &middot; Claim No. 3</div></div>
+  </div>
+
+  <div class="meta">
+    <div><h3>Bill to</h3><b>Syarikat ABC Sdn Bhd</b><br>Reg. No. 202001012345 &middot; TIN C1234567890<br>88 Jalan Niaga, 47000 Sungai Buloh, Selangor<br>Attn: Puan Siti</div>
+    <table>
+      <tr><td>Date</td><td>14 Nov 2026</td></tr>
+      <tr><td>Due date</td><td>14 Dec 2026</td></tr>
+      <tr><td>Work done</td><td>13 Oct - 13 Nov 2026</td></tr>
+      <tr><td>Project</td><td>P-2026-003</td></tr>
+    </table>
+  </div>
+
+  <p><b>Project:</b> Renovation of 2-storey shoplot at 12 Jalan Bunga, 47000 Sungai Buloh</p>
+
+  <table class="items">
+    <tr><th style="width:8mm">No.</th><th>Description</th><th class="num">Contract (RM)</th><th class="num">Previous (RM)</th><th class="num">This claim (RM)</th><th class="num">To date (RM)</th><th class="num" style="width:12mm">%</th></tr>
+    <tr><td>A</td><td>Preliminaries</td><td class="num">18,000.00</td><td class="num">18,000.00</td><td class="num">-</td><td class="num">18,000.00</td><td class="num">100</td></tr>
+    <tr><td>B</td><td>Demolition and site clearing</td><td class="num">24,500.00</td><td class="num">24,500.00</td><td class="num">-</td><td class="num">24,500.00</td><td class="num">100</td></tr>
+    <tr><td>C</td><td>Structural works</td><td class="num">96,000.00</td><td class="num">43,200.00</td><td class="num">33,600.00</td><td class="num">76,800.00</td><td class="num">80</td></tr>
+    <tr><td>D</td><td>Brickwork and plastering</td><td class="num">58,000.00</td><td class="num">5,800.00</td><td class="num">17,400.00</td><td class="num">23,200.00</td><td class="num">40</td></tr>
+    <tr><td>E</td><td>Mechanical and electrical works</td><td class="num">72,500.00</td><td class="num">-</td><td class="num">14,500.00</td><td class="num">14,500.00</td><td class="num">20</td></tr>
+    <tr><td>F</td><td>Finishes</td><td class="num">81,000.00</td><td class="num">-</td><td class="num">-</td><td class="num">-</td><td class="num">0</td></tr>
+    <tr class="sec"><td></td><td colspan="6">Variation orders</td></tr>
+    <tr><td>VO-01</td><td>Additional partition wall, first floor</td><td class="num">12,000.00</td><td class="num">-</td><td class="num">6,000.00</td><td class="num">6,000.00</td><td class="num">50</td></tr>
+    <tr class="tot"><td></td><td>Total</td><td class="num">362,000.00</td><td class="num">91,500.00</td><td class="num">71,500.00</td><td class="num">163,000.00</td><td class="num">45</td></tr>
+  </table>
+
+  <table class="sum" style="width:100mm">
+    <tr><td>Value of work done to date</td><td class="num">163,000.00</td></tr>
+    <tr><td>Less retention 10% (limit RM 18,100.00)</td><td class="num">(16,300.00)</td></tr>
+    <tr class="line"><td>Net value to date</td><td class="num">146,700.00</td></tr>
+    <tr><td>Less previously claimed (Claims 1-2)</td><td class="num">(82,350.00)</td></tr>
+    <tr class="line"><td>Amount this claim</td><td class="num">64,350.00</td></tr>
+    <tr><td>SST 6%</td><td class="num">3,861.00</td></tr>
+    <tr class="grand"><td>Amount due (RM)</td><td class="num">68,211.00</td></tr>
+  </table>
+
+  <div class="cols" style="margin-top:7mm">
+    <div class="block" style="margin-top:0"><h3>Payment</h3>
+      Please pay by 14 Dec 2026 to:<br>
+      <b>Contoh Bina Sdn Bhd</b><br>Bank name &middot; Account no. 0000 0000 0000<br>
+      Quote reference PC-2026-0031 with your payment.
+      <h3 style="margin-top:4mm">Retention summary</h3>
+      Held to date RM 16,300.00 &middot; Released RM 0.00 &middot; Balance held RM 16,300.00
+    </div>
+    <div style="display:flex;gap:3mm;align-items:flex-start;justify-content:flex-end">
+      <div style="font-size:8pt;color:#6b7385;text-align:right">e-Invoice<br>validated by LHDN<br>ID shown here</div>
+      <div class="qr">QR code<br>after validation</div>
+    </div>
+  </div>
+
+  <div class="sign">
+    <div>Prepared by<br><br><br>Name:<br>Date:</div>
+    <div>Certified by (client or consultant)<br><br><br>Name:<br>Date:</div>
+  </div>
+
+  <div class="foot"><span>PC-2026-0031 &middot; P-2026-003 Claim No. 3</span><span>Page 1 of 1</span></div>
+</div>
+</body>
+</html>
+

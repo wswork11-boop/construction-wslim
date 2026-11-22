@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mobile app - mockup</title>
+<link rel="stylesheet" href="mockup.css">
+<style>
+  body { padding: 20px 24px 40px; }
+  .phones { display: flex; flex-wrap: wrap; gap: 26px; }
+  .col h2 { margin: 0 0 2px; } .col p { margin: 0 0 8px; max-width: 300px; }
+  .phone { width: 300px; height: 620px; background: #f4f5f7; border: 9px solid #1b1f2a; border-radius: 30px; overflow: hidden; display: flex; flex-direction: column; font-size: 15px; }
+  .bar-top { background: var(--brand); color: #fff; padding: 12px 14px; font-weight: 600; display: flex; gap: 8px; align-items: center; }
+  .bar-top .sp { flex: 1; } .bar-top small { font-weight: 400; opacity: .85; }
+  .body { flex: 1; overflow: auto; padding: 12px; }
+  .foot { padding: 10px 12px; background: #fff; border-top: 1px solid var(--line); }
+  .big { display: block; width: 100%; text-align: center; padding: 13px; border-radius: 10px; background: var(--brand); color: #fff; font-weight: 600; font-size: 16px; border: 0; }
+  .big.ghost { background: #fff; color: var(--brand); border: 1px solid var(--brand); }
+  .item { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 11px 12px; margin-bottom: 9px; }
+  .item .t { font-weight: 600; } .row { display: flex; align-items: center; gap: 8px; } .row .sp { flex: 1; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; } .chip { padding: 8px 12px; border-radius: 99px; border: 1px solid #c9ceda; background: #fff; }
+  .chip.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .banner { padding: 7px 12px; font-size: 13px; background: var(--warn-soft); color: var(--warn); }
+  .banner.off { background: #3b4254; color: #fff; }
+  .lbl { font-size: 12px; color: var(--muted); margin: 12px 0 4px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .phone textarea, .phone input { font-size: 15px; padding: 10px; }
+  .thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .add { border: 2px dashed #b4bccd; border-radius: 6px; aspect-ratio: 4/3; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 22px; background: #fff; }
+  .step { width: 34px; height: 34px; border-radius: 8px; border: 1px solid #c9ceda; background: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; }
+</style>
+</head>
+<body>
+<h1>Mobile app for site staff</h1>
+<p class="note" style="max-width:900px;margin-top:10px">Static mockup. Six screens shown side by side. Designed for use on site: large buttons, few required fields (work done and at least one photo), no prices anywhere, and everything works without signal.</p>
+
+<div class="phones">
+
+  <div class="col"><h2>1. Login</h2><p class="small muted">Stays signed in on the device.</p>
+    <div class="phone">
+      <div class="body" style="display:flex;flex-direction:column;justify-content:center;padding:24px">
+        <div style="text-align:center;font-size:20px;font-weight:700;margin-bottom:4px">Contoh Bina</div>
+        <div class="muted" style="text-align:center;margin-bottom:26px">Site reports</div>
+        <div class="field"><label>Email</label><input value="kumar@example.com"></div>
+        <div class="field"><label>Password</label><input type="password" value="xxxxxxxx"></div>
+        <button class="big" style="margin-top:8px">Log in</button>
+        <p class="small muted" style="text-align:center">Forgot password? Contact the office.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col"><h2>2. My projects</h2><p class="small muted">Only projects the user is assigned to.</p>
+    <div class="phone">
+      <div class="bar-top">My projects<span class="sp"></span><small>Kumar</small></div>
+      <div class="banner">1 report waiting to upload</div>
+      <div class="body">
+        <div class="item"><div class="row"><span class="t">Shoplot renovation</span><span class="sp"></span><span class="pill warn">Today: not done</span></div><div class="small muted">P-2026-003 &middot; Jalan Bunga, Sungai Buloh</div></div>
+        <div class="item"><div class="row"><span class="t">Taman Indah bungalow</span><span class="sp"></span><span class="pill ok">Today: sent</span></div><div class="small muted">P-2026-005 &middot; Taman Indah, Rawang</div></div>
+        <p class="small muted" style="text-align:center;margin-top:20px">Pull down to refresh</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="col"><h2>3. Project home</h2><p class="small muted">One obvious action: today's report.</p>
+    <div class="phone">
+      <div class="bar-top">&larr; Shoplot renovation</div>
+      <div class="body">
+        <div class="item" style="text-align:center"><div class="muted small">Tuesday 17 Nov 2026</div><div class="t" style="margin:6px 0 10px">No report for today yet</div><button class="big">New daily report</button></div>
+        <div class="lbl">Recent reports</div>
+        <div class="item row"><div><div class="t">Mon 16 Nov</div><div class="small muted">17 workers &middot; 6 photos</div></div><span class="sp"></span><span class="pill ok">Uploaded</span></div>
+        <div class="item row"><div><div class="t">Sat 14 Nov</div><div class="small muted">15 workers &middot; 4 photos</div></div><span class="sp"></span><span class="pill info">Reviewed</span></div>
+        <div class="item row"><div><div class="t">Fri 13 Nov</div><div class="small muted">16 workers &middot; 8 photos</div></div><span class="sp"></span><span class="pill info">Reviewed</span></div>
+        <div class="lbl">Site</div>
+        <div class="item small">12 Jalan Bunga, 47000 Sungai Buloh<br><span class="muted">Project manager: Faizal, 012-000 0012</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col"><h2>4. New daily report</h2><p class="small muted">Saves as you type. Manpower remembers yesterday's trades.</p>
+    <div class="phone">
+      <div class="bar-top">&larr; Daily report<span class="sp"></span><small>Draft saved</small></div>
+      <div class="banner off">No signal - report will upload later</div>
+      <div class="body">
+        <div class="lbl" style="margin-top:0">Date</div>
+        <div class="chips"><span class="chip on">Today 17 Nov</span><span class="chip">Yesterday</span><span class="chip">15 Nov</span></div>
+        <div class="lbl">Weather</div>
+        <div class="chips"><span class="chip">Sunny</span><span class="chip on">Cloudy</span><span class="chip">Rain</span><span class="chip">Heavy rain</span></div>
+        <div class="lbl">Photos * (3)</div>
+        <div class="thumbs"><div class="ph">Formwork</div><div class="ph">Front wall</div><div class="ph">Rebar</div><div class="add">+</div></div>
+        <div class="lbl">Work done today *</div>
+        <textarea rows="3">Stripped column formwork grid A-B. Brickwall front shop to 1.5 m.</textarea>
+        <div class="lbl">Manpower</div>
+        <div class="item row" style="padding:7px 10px"><span>Carpenter</span><span class="sp"></span><span class="step">&minus;</span><b style="width:22px;text-align:center">4</b><span class="step">+</span></div>
+        <div class="item row" style="padding:7px 10px"><span>Bricklayer</span><span class="sp"></span><span class="step">&minus;</span><b style="width:22px;text-align:center">5</b><span class="step">+</span></div>
+        <div class="item row" style="padding:7px 10px"><span>General worker</span><span class="sp"></span><span class="step">&minus;</span><b style="width:22px;text-align:center">6</b><span class="step">+</span></div>
+        <a class="small">+ Add trade</a>
+        <div class="lbl">Issues or delays</div>
+        <textarea rows="2" placeholder="Optional"></textarea>
+        <div class="lbl">Plan for tomorrow</div>
+        <textarea rows="2" placeholder="Optional"></textarea>
+      </div>
+      <div class="foot"><button class="big">Submit report</button></div>
+    </div>
+  </div>
+
+  <div class="col"><h2>5. Report sent / detail</h2><p class="small muted">Can be edited until reviewed or 48 hours pass.</p>
+    <div class="phone">
+      <div class="bar-top">&larr; Mon 16 Nov<span class="sp"></span><small>Edit</small></div>
+      <div class="body">
+        <div class="row"><span class="pill ok">Uploaded 5:42 pm</span><span class="pill">Cloudy</span><span class="pill">17 workers</span></div>
+        <div class="lbl">Photos (6)</div>
+        <div class="thumbs"><div class="ph">L1 columns</div><div class="ph">Rear wall</div><div class="ph">Conduit</div><div class="ph">Sand</div><div class="ph">Staircase</div><div class="ph">Rebar</div></div>
+        <div class="lbl">Work done</div>
+        <div class="item">Completed formwork and casting for L1 columns grid C-D. Brickwall at rear shop reached lintel level. Electrical conduit laid in ground-floor slab.</div>
+        <div class="lbl">Issues or delays</div>
+        <div class="item">Sand delivery arrived 2 hours late; plastering team idle in the morning.</div>
+        <div class="lbl">Manpower</div>
+        <div class="item small">Carpenter 4 &middot; Bricklayer 5 &middot; Electrician 2 &middot; General worker 6</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col"><h2>6. Pending uploads</h2><p class="small muted">Shows exactly what has and has not reached the office.</p>
+    <div class="phone">
+      <div class="bar-top">&larr; Pending uploads</div>
+      <div class="body">
+        <div class="item"><div class="row"><span class="t">Shoplot &middot; Tue 17 Nov</span><span class="sp"></span><span class="pill warn">Uploading</span></div><div class="small muted" style="margin:6px 0">Photo 2 of 3</div><div class="bar"><i style="width:55%"></i></div></div>
+        <div class="item"><div class="row"><span class="t">Bungalow &middot; Sat 14 Nov</span><span class="sp"></span><span class="pill bad">Failed</span></div><div class="small muted" style="margin:6px 0">Report date is more than 2 days old. Contact the office.</div><button class="big ghost" style="padding:9px">Retry</button></div>
+        <p class="small muted" style="text-align:center;margin-top:18px">Uploads continue automatically when there is signal. Reports stay on this phone until they are uploaded.</p>
+      </div>
+      <div class="foot"><button class="big ghost">Upload now</button></div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
+

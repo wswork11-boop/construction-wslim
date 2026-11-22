@@ -1,0 +1,35 @@
+/* A4 document layouts. These become the real PDF templates (rendered by the API). */
+@page { size: A4; margin: 14mm; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #d9dce3; font: 10.5pt/1.4 "Segoe UI", Arial, sans-serif; color: #1a1f2b; }
+.page { width: 210mm; min-height: 297mm; margin: 10mm auto; padding: 14mm; background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.2); position: relative; }
+@media print { body { background: #fff; } .page { margin: 0; box-shadow: none; padding: 0; width: auto; min-height: 0; } .hint { display: none; } }
+.hint { max-width: 210mm; margin: 8mm auto -4mm; font-size: 9.5pt; color: #6b5300; background: #fffbe6; border: 1px dashed #d9b84a; padding: 6px 10px; border-radius: 6px; }
+.head { display: flex; justify-content: space-between; gap: 10mm; border-bottom: 2px solid #1f5fbf; padding-bottom: 5mm; }
+.logo { width: 22mm; height: 22mm; background: #e8f0fc; color: #1f5fbf; display: flex; align-items: center; justify-content: center; font-weight: 700; border-radius: 3mm; font-size: 9pt; }
+.co { display: flex; gap: 4mm; } .co b { font-size: 13pt; } .co div { font-size: 9pt; color: #4a5266; }
+.title { text-align: right; } .title h1 { margin: 0; font-size: 18pt; letter-spacing: .04em; color: #1f5fbf; } .title div { font-size: 9.5pt; }
+.meta { display: flex; justify-content: space-between; gap: 10mm; margin: 6mm 0; }
+.meta h3 { margin: 0 0 1mm; font-size: 8pt; text-transform: uppercase; letter-spacing: .06em; color: #6b7385; }
+.meta table { border-collapse: collapse; } .meta td { padding: .6mm 0; } .meta td:first-child { color: #6b7385; padding-right: 5mm; }
+table.items { width: 100%; border-collapse: collapse; font-size: 9.5pt; }
+table.items th { background: #1f5fbf; color: #fff; text-align: left; padding: 2mm 2.2mm; font-weight: 600; font-size: 8.5pt; }
+table.items td { padding: 1.8mm 2.2mm; border-bottom: .2mm solid #dfe3ea; vertical-align: top; }
+table.items tr.sec td { background: #eef1f6; font-weight: 600; }
+table.items tr.tot td { font-weight: 700; border-top: .5mm solid #1a1f2b; border-bottom: 0; }
+.num { text-align: right !important; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sum { margin-left: auto; width: 82mm; margin-top: 4mm; border-collapse: collapse; }
+.sum td { padding: 1.3mm 2.2mm; } .sum tr.grand td { font-weight: 700; font-size: 12pt; border-top: .5mm solid #1a1f2b; background: #e8f0fc; }
+.sum tr.line td { border-top: .2mm solid #b9c0cf; font-weight: 600; }
+.block { margin-top: 7mm; font-size: 9.5pt; } .block h3 { margin: 0 0 1.5mm; font-size: 8pt; text-transform: uppercase; letter-spacing: .06em; color: #6b7385; }
+.block ol { margin: 0; padding-left: 5mm; }
+.sign { display: flex; justify-content: space-between; gap: 14mm; margin-top: 16mm; font-size: 9.5pt; }
+.sign div { flex: 1; border-top: .3mm solid #1a1f2b; padding-top: 1.5mm; }
+.foot { position: absolute; left: 14mm; right: 14mm; bottom: 8mm; font-size: 8pt; color: #6b7385; display: flex; justify-content: space-between; border-top: .2mm solid #dfe3ea; padding-top: 2mm; }
+@media print { .foot { position: fixed; left: 0; right: 0; bottom: 0; } }
+.photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
+.photos figure { margin: 0; } .photos .ph { background: linear-gradient(135deg, #cfd6e4, #aab4c8); aspect-ratio: 4/3; border-radius: 1.5mm; }
+.photos figcaption { font-size: 8.5pt; color: #4a5266; margin-top: 1mm; }
+.cols { display: grid; grid-template-columns: 1fr 62mm; gap: 8mm; }
+.qr { width: 24mm; height: 24mm; border: .3mm dashed #9aa3b5; display: flex; align-items: center; justify-content: center; font-size: 7pt; color: #6b7385; text-align: center; }
+

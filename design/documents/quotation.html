@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quotation layout</title>
+<link rel="stylesheet" href="document.css">
+</head>
+<body>
+<div class="hint">Proposed quotation layout with sample data. Press Ctrl+P to see it as it would print. A simple invoice uses the same layout with the title "INVOICE", a due date, bank details and no signature block.</div>
+<div class="page">
+  <div class="head">
+    <div class="co"><div class="logo">LOGO</div><div><b>Contoh Bina Sdn Bhd</b><br>Reg. No. 201901000001 &middot; TIN C0000000001<br>1 Jalan Contoh, 47000 Sungai Buloh, Selangor<br>Tel 03-0000 0000 &middot; office@example.com</div></div>
+    <div class="title"><h1>QUOTATION</h1><div><b>QT-2026-0014</b> Rev 2</div></div>
+  </div>
+
+  <div class="meta">
+    <div><h3>To</h3><b>Syarikat ABC Sdn Bhd</b><br>Reg. No. 202001012345<br>88 Jalan Niaga, 47000 Sungai Buloh, Selangor<br>Attn: Puan Siti &middot; 012-000 0001</div>
+    <table>
+      <tr><td>Date</td><td>20 Aug 2026</td></tr>
+      <tr><td>Valid until</td><td>19 Sep 2026</td></tr>
+      <tr><td>Prepared by</td><td>Mei Ling</td></tr>
+    </table>
+  </div>
+
+  <p><b>Project:</b> Renovation of 2-storey shoplot at 12 Jalan Bunga, 47000 Sungai Buloh</p>
+
+  <table class="items">
+    <tr><th style="width:9mm">No.</th><th>Description</th><th style="width:14mm">Unit</th><th class="num" style="width:20mm">Qty</th><th class="num" style="width:24mm">Rate (RM)</th><th class="num" style="width:28mm">Amount (RM)</th></tr>
+    <tr class="sec"><td>A</td><td colspan="4">Preliminaries</td><td class="num">18,000.00</td></tr>
+    <tr><td>A1</td><td>Mobilisation and site setup</td><td>LS</td><td class="num">1</td><td class="num">10,000.00</td><td class="num">10,000.00</td></tr>
+    <tr><td>A2</td><td>Hoarding and safety provisions</td><td>LS</td><td class="num">1</td><td class="num">8,000.00</td><td class="num">8,000.00</td></tr>
+    <tr class="sec"><td>B</td><td colspan="4">Demolition and site clearing</td><td class="num">24,500.00</td></tr>
+    <tr><td>B1</td><td>Demolish existing partitions</td><td>m&sup2;</td><td class="num">350</td><td class="num">40.00</td><td class="num">14,000.00</td></tr>
+    <tr><td>B2</td><td>Debris disposal</td><td>trip</td><td class="num">15</td><td class="num">700.00</td><td class="num">10,500.00</td></tr>
+    <tr class="sec"><td>C</td><td colspan="4">Structural works</td><td class="num">96,000.00</td></tr>
+    <tr><td>C1</td><td>Reinforced concrete beams and columns</td><td>m&sup3;</td><td class="num">60</td><td class="num">1,100.00</td><td class="num">66,000.00</td></tr>
+    <tr><td>C2</td><td>Steel staircase, supply and install</td><td>no.</td><td class="num">1</td><td class="num">30,000.00</td><td class="num">30,000.00</td></tr>
+    <tr class="sec"><td>D</td><td colspan="4">Brickwork and plastering</td><td class="num">58,000.00</td></tr>
+    <tr><td>D1</td><td>115 mm brickwall</td><td>m&sup2;</td><td class="num">800</td><td class="num">45.00</td><td class="num">36,000.00</td></tr>
+    <tr><td>D2</td><td>Cement plastering, both sides</td><td>m&sup2;</td><td class="num">1,100</td><td class="num">20.00</td><td class="num">22,000.00</td></tr>
+    <tr class="sec"><td>E</td><td colspan="4">Mechanical and electrical works</td><td class="num">72,500.00</td></tr>
+    <tr><td>E1</td><td>Electrical wiring, distribution board and fittings</td><td>LS</td><td class="num">1</td><td class="num">42,500.00</td><td class="num">42,500.00</td></tr>
+    <tr><td>E2</td><td>Plumbing and sanitary works</td><td>LS</td><td class="num">1</td><td class="num">30,000.00</td><td class="num">30,000.00</td></tr>
+    <tr class="sec"><td>F</td><td colspan="4">Finishes</td><td class="num">81,000.00</td></tr>
+    <tr><td>F1</td><td>Floor tiling, 600 x 600 porcelain</td><td>m&sup2;</td><td class="num">600</td><td class="num">85.00</td><td class="num">51,000.00</td></tr>
+    <tr><td>F2</td><td>Painting, internal and external</td><td>m&sup2;</td><td class="num">1,500</td><td class="num">12.00</td><td class="num">18,000.00</td></tr>
+    <tr><td>F3</td><td>Suspended ceiling</td><td>m&sup2;</td><td class="num">300</td><td class="num">40.00</td><td class="num">12,000.00</td></tr>
+  </table>
+
+  <table class="sum">
+    <tr><td>Subtotal</td><td class="num">350,000.00</td></tr>
+    <tr><td>SST 6%</td><td class="num">21,000.00</td></tr>
+    <tr class="grand"><td>Total (RM)</td><td class="num">371,000.00</td></tr>
+  </table>
+
+  <div class="block"><h3>Terms and conditions</h3>
+    <ol>
+      <li>Payment by monthly progress claim, due 30 days from invoice date.</li>
+      <li>Retention of 10% of each claim, limited to 5% of the contract sum; half released at practical completion and half at the end of the 12-month defects liability period.</li>
+      <li>Work outside this quotation will be priced as a variation order and agreed in writing before it starts.</li>
+      <li>This quotation is valid until the date shown above.</li>
+    </ol>
+  </div>
+
+  <div class="sign">
+    <div>For Contoh Bina Sdn Bhd<br><br><br>Name:<br>Date:</div>
+    <div>Accepted by (client signature and company stamp)<br><br><br>Name:<br>Date:</div>
+  </div>
+
+  <div class="foot"><span>QT-2026-0014 Rev 2</span><span>Page 1 of 1</span></div>
+</div>
+</body>
+</html>
+
