@@ -26,7 +26,18 @@ export const EnvSchema = z.object({
 export type AppEnv = z.infer<typeof EnvSchema>;
 
 export function validateEnv(config: Record<string, unknown>): AppEnv {
-  const parsed = EnvSchema.safeParse(config);
+  const cleaned: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(config)) {
+    if (typeof v === 'string') {
+      const stripped = v.trim().replace(/^["']|["']$/g, '');
+      if (stripped !== '') {
+        cleaned[k] = stripped;
+      }
+    } else if (v !== undefined) {
+      cleaned[k] = v;
+    }
+  }
+  const parsed = EnvSchema.safeParse(cleaned);
   if (!parsed.success) {
     const errors = parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; ');
     throw new Error(`Invalid environment configuration: ${errors}`);

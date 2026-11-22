@@ -4,10 +4,14 @@ import * as path from 'path';
 import { InMemoryDatabase } from './in-memory-db';
 import { hashPassword } from '../common/password';
 
+function stripQuotes(s: string): string {
+  return s.trim().replace(/^["']|["']$/g, '');
+}
+
 export async function seedInitialData(prisma: any) {
-  const ownerEmail = (process.env.SEED_OWNER_EMAIL || 'owner@example.com').toLowerCase().trim();
-  const ownerPassword = process.env.SEED_OWNER_PASSWORD || 'Password123!';
-  const ownerName = process.env.SEED_OWNER_NAME || 'Owner';
+  const ownerEmail = stripQuotes(process.env.SEED_OWNER_EMAIL || 'owner@example.com').toLowerCase();
+  const ownerPassword = stripQuotes(process.env.SEED_OWNER_PASSWORD || 'Password123!');
+  const ownerName = stripQuotes(process.env.SEED_OWNER_NAME || 'Owner');
 
   const passwordHash = await hashPassword(ownerPassword);
 
@@ -15,6 +19,7 @@ export async function seedInitialData(prisma: any) {
     where: { email: ownerEmail },
     update: {
       name: ownerName,
+      passwordHash,
       role: Role.OWNER,
       isActive: true,
     },

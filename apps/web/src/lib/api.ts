@@ -1,8 +1,20 @@
 import { authStore } from './auth';
 
+const DEFAULT_PROD_API = 'https://construction-stl.up.railway.app';
 const rawApiUrl = (import.meta as any).env?.VITE_API_URL as string | undefined;
-const API_BASE = rawApiUrl
-  ? `${rawApiUrl.replace(/\/$/, '').replace(/\/api\/v1$/, '')}/api/v1`
+const isLocalHost =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+const effectiveBase =
+  rawApiUrl && !rawApiUrl.includes('construction-api-production.up.railway.app')
+    ? rawApiUrl
+    : !isLocalHost && typeof window !== 'undefined'
+      ? DEFAULT_PROD_API
+      : '';
+
+const API_BASE = effectiveBase
+  ? `${effectiveBase.replace(/\/$/, '').replace(/\/api\/v1$/, '')}/api/v1`
   : '/api/v1';
 
 let refreshInFlight: Promise<string | null> | null = null;
