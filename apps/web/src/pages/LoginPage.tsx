@@ -3,10 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { apiFetch } from '../lib/api';
 import { authStore } from '../lib/auth';
 
+const REMEMBERED_EMAIL_KEY = 'construction_remembered_email';
+
 export const LoginPage: React.FC = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState('owner@example.com');
+  const savedEmail =
+    typeof window !== 'undefined' ? localStorage.getItem(REMEMBERED_EMAIL_KEY) || '' : '';
+
+  const [email, setEmail] = useState(savedEmail);
   const [password, setPassword] = useState('');
+  const [rememberEmail, setRememberEmail] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -15,16 +21,24 @@ export const LoginPage: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
+      const cleanEmail = email.trim();
       const res = await apiFetch('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password, deviceName: 'Office Web' }),
+        body: JSON.stringify({ email: cleanEmail, password, deviceName: 'Office Web' }),
       });
+      if (typeof window !== 'undefined') {
+        if (rememberEmail) {
+          localStorage.setItem(REMEMBERED_EMAIL_KEY, cleanEmail);
+        } else {
+          localStorage.removeItem(REMEMBERED_EMAIL_KEY);
+        }
+      }
       authStore.setSession({
         user: res.user,
         accessToken: res.accessToken,
         refreshToken: res.refreshToken,
       });
-      navigate('/projects');
+      navigate('/dashboard');
     } catch (err: any) {
       setError(err.message || 'Invalid credentials');
     } finally {
@@ -53,6 +67,9 @@ export const LoginPage: React.FC = () => {
             <label>Email</label>
             <input
               type="email"
+              name="email"
+              autoComplete="username"
+              placeholder="you@company.com"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -62,10 +79,35 @@ export const LoginPage: React.FC = () => {
             <label>Password</label>
             <input
               type="password"
+              name="password"
+              autoComplete="current-password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
+          </div>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginTop: 4,
+              marginBottom: 8,
+            }}
+          >
+            <input
+              id="remember-email"
+              type="checkbox"
+              checked={rememberEmail}
+              onChange={(e) => setRememberEmail(e.target.checked)}
+              style={{ width: 'auto', margin: 0 }}
+            />
+            <label
+              htmlFor="remember-email"
+              style={{ margin: 0, fontWeight: 400, cursor: 'pointer' }}
+            >
+              Remember my email
+            </label>
           </div>
           <button
             type="submit"
