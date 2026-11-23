@@ -6,7 +6,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl \
   && rm -rf /var/lib/apt/lists/*
 
-ENV NODE_ENV=production
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
@@ -16,11 +15,12 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* turbo.json tsconfig.base.j
 COPY packages/shared ./packages/shared
 COPY apps/api ./apps/api
 
-RUN pnpm install
+RUN pnpm install --prod=false
 RUN pnpm --filter @construction/shared build
 RUN pnpm --filter @construction/api prisma:generate
 RUN pnpm --filter @construction/api build
 
+ENV NODE_ENV=production
 WORKDIR /app/apps/api
 EXPOSE 3000
 CMD ["sh", "-c", "npx prisma db push --skip-generate && node dist/main.js"]
