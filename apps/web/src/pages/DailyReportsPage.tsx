@@ -93,7 +93,7 @@ export const DailyReportsPage: React.FC = () => {
 
       {error && <div className="error-banner">{error}</div>}
 
-      <div className="split" style={{ gridTemplateColumns: '340px 1fr' }}>
+      <div className="split split-left">
         <div className="card">
           <h2>Report calendar</h2>
           <div className="cal">

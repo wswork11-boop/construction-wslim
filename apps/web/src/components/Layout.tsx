@@ -1,12 +1,18 @@
-import React from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Role } from '@construction/shared';
 import { authStore } from '../lib/auth';
 import { apiFetch } from '../lib/api';
 
 export const Layout: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, refreshToken } = authStore.getState();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [location.pathname, location.search]);
 
   const handleLogout = async () => {
     try {
@@ -26,7 +32,22 @@ export const Layout: React.FC = () => {
 
   return (
     <div className="app">
-      <nav className="side">
+      <header className="mobile-header">
+        <button
+          type="button"
+          className="mobile-menu-btn"
+          aria-label="Toggle navigation menu"
+          onClick={() => setMenuOpen((prev) => !prev)}
+        >
+          {menuOpen ? '\u2715' : '\u2630'}
+        </button>
+        <div className="mobile-logo">Construction System</div>
+        <div className="mobile-user small">{user?.name}</div>
+      </header>
+
+      {menuOpen && <div className="side-backdrop" onClick={() => setMenuOpen(false)} />}
+
+      <nav className={`side ${menuOpen ? 'open' : ''}`}>
         <div className="logo">Construction System</div>
         {(user?.role === Role.OWNER || user?.role === Role.OFFICE) && (
           <NavLink to="/dashboard" className={({ isActive }) => (isActive ? 'on' : '')}>
