@@ -19,6 +19,7 @@ import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/decorators';
 import { AppException } from '../common/errors';
 import { ProjectAccessService } from '../common/project-access.service';
+import { CompanyService } from '../company/company.service';
 import { SequenceService } from '../company/sequence.service';
 import { FilesService } from '../files/files.service';
 
@@ -34,6 +35,7 @@ export class ExpensesService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly projectAccessService: ProjectAccessService,
+    private readonly companyService: CompanyService,
     private readonly sequenceService: SequenceService,
     private readonly filesService: FilesService,
   ) {}
@@ -61,9 +63,20 @@ export class ExpensesService {
       }
     }
 
+    const resolvedCompany = row.company || row.project?.company || null;
+    const resolvedCompanyId = row.companyId ?? row.project?.companyId ?? resolvedCompany?.id ?? null;
+
     return {
       id: row.id,
       number: row.number,
+      companyId: resolvedCompanyId,
+      company: resolvedCompany
+        ? {
+            id: resolvedCompany.id,
+            code: resolvedCompany.code ?? null,
+            name: resolvedCompany.name,
+          }
+        : null,
       projectId: row.projectId ?? null,
       projectCodeRef: row.projectCodeRef ?? row.project?.code ?? null,
       project: row.project
@@ -114,6 +127,7 @@ export class ExpensesService {
       sort?: string;
       q?: string;
       projectId?: string;
+      companyId?: string;
       category?: string;
       status?: string;
       from?: string;
@@ -121,15 +135,23 @@ export class ExpensesService {
     },
   ) {
     const allowedProjectIds = await this.projectAccessService.getAccessibleProjectIds(user);
+    const accessibleCompanyIds = await this.projectAccessService.getAccessibleCompanyIds(user);
 
     const all = await this.prisma.expense.findMany({
-      include: { project: true, createdBy: true },
+      include: { company: true, project: { include: { company: true } }, createdBy: true },
       orderBy: { expenseDate: 'desc' },
     });
 
     const qLower = query.q?.trim().toLowerCase();
 
     const filtered = all.filter((exp: any) => {
+      const expCompId = exp.companyId ?? exp.project?.companyId ?? null;
+      if (accessibleCompanyIds !== null && accessibleCompanyIds.length > 0) {
+        if (!expCompId || !accessibleCompanyIds.includes(expCompId)) {
+          return false;
+        }
+      }
+      if (query.companyId && expCompId !== query.companyId) return false;
       if (allowedProjectIds !== null) {
         if (!exp.projectId || !allowedProjectIds.includes(exp.projectId)) {
           return false;
@@ -194,7 +216,7 @@ export class ExpensesService {
   async getById(user: AuthUser, id: string, tx: any = this.prisma) {
     const exp = await tx.expense.findUnique({
       where: { id },
-      include: { project: true, createdBy: true },
+      include: { company: true, project: { include: { company: true } }, createdBy: true },
     });
     if (!exp) {
       throw AppException.notFound('NOT_FOUND', 'Expense not found');
@@ -225,13 +247,18 @@ export class ExpensesService {
     }
 
     let projectCodeRef: string | null = null;
+    let projectCompanyId: string | null = null;
     if (dto.projectId) {
       const project = await this.prisma.project.findUnique({ where: { id: dto.projectId } });
       if (!project) {
         throw AppException.unprocessable('PROJECT_NOT_FOUND', 'projectId does not exist');
       }
       projectCodeRef = project.code;
+      projectCompanyId = project.companyId ?? null;
     }
+
+    const fallbackCompany = await this.companyService.getCompany(user);
+    const resolvedCompanyId = dto.companyId ?? projectCompanyId ?? fallbackCompany.id;
 
     if (dto.receiptFileId) {
       const file = await this.prisma.file.findUnique({ where: { id: dto.receiptFileId } });
@@ -258,6 +285,7 @@ export class ExpensesService {
         data: {
           id,
           number,
+          companyId: resolvedCompanyId,
           projectId: dto.projectId ?? null,
           projectCodeRef,
           category: dto.category,
@@ -318,13 +346,18 @@ export class ExpensesService {
     }
 
     let projectCodeRef: string | null = null;
+    let projectCompanyId: string | null = null;
     if (dto.projectId) {
       const project = await this.prisma.project.findUnique({ where: { id: dto.projectId } });
       if (!project) {
         throw AppException.unprocessable('PROJECT_NOT_FOUND', 'projectId does not exist');
       }
       projectCodeRef = project.code;
+      projectCompanyId = project.companyId ?? null;
     }
+
+    const fallbackCompany = await this.companyService.getCompany(user);
+    const resolvedCompanyId = dto.companyId ?? projectCompanyId ?? fallbackCompany.id;
 
     const taxPercentStr = await this.resolveTaxPercent(dto.taxRateId);
     const subtotalDec = roundMoney(dto.amount);
@@ -336,6 +369,7 @@ export class ExpensesService {
       await tx.expense.update({
         where: { id },
         data: {
+          companyId: resolvedCompanyId,
           projectId: dto.projectId ?? null,
           projectCodeRef,
           category: dto.category,

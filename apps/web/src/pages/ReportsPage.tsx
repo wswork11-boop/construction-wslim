@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Role } from '@construction/shared';
 import { apiDownload, apiFetch } from '../lib/api';
 import { authStore } from '../lib/auth';
+import { activeProjectStore } from '../lib/active-project';
 
 type ReportTab = 'ageing' | 'pipeline' | 'billing' | 'retention' | 'compliance';
 
@@ -21,8 +22,16 @@ export const ReportsPage: React.FC = () => {
   const [asOf, setAsOf] = useState(today);
   const [from, setFrom] = useState(firstOfMonth);
   const [to, setTo] = useState(today);
+  const [companyId, setCompanyId] = useState(activeProjectStore.getCompanyId());
   const [clientId, setClientId] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(activeProjectStore.getProjectId());
+
+  useEffect(() => {
+    return activeProjectStore.subscribe(() => {
+      setCompanyId(activeProjectStore.getCompanyId());
+      setProjectId(activeProjectStore.getProjectId());
+    });
+  }, []);
 
   const [clients, setClients] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
@@ -60,6 +69,7 @@ export const ReportsPage: React.FC = () => {
       if (tab === 'ageing' && isOwnerOrOffice) {
         const qs = buildQueryString({
           asOf,
+          companyId: companyId || undefined,
           clientId: clientId || undefined,
           projectId: projectId || undefined,
         });
@@ -69,6 +79,7 @@ export const ReportsPage: React.FC = () => {
         const qs = buildQueryString({
           from: from || undefined,
           to: to || undefined,
+          companyId: companyId || undefined,
           clientId: clientId || undefined,
         });
         const res = await apiFetch(`/reports/quotation-pipeline${qs}`);
@@ -77,6 +88,7 @@ export const ReportsPage: React.FC = () => {
         const qs = buildQueryString({
           from: from || yearStart,
           to: to || today,
+          companyId: companyId || undefined,
           clientId: clientId || undefined,
           projectId: projectId || undefined,
         });
@@ -84,6 +96,7 @@ export const ReportsPage: React.FC = () => {
         setBillingData(res);
       } else if (tab === 'retention') {
         const qs = buildQueryString({
+          companyId: companyId || undefined,
           clientId: clientId || undefined,
           projectId: projectId || undefined,
         });
@@ -93,6 +106,7 @@ export const ReportsPage: React.FC = () => {
         const qs = buildQueryString({
           from: from || firstOfMonth,
           to: to || today,
+          companyId: companyId || undefined,
           projectId: projectId || undefined,
         });
         const res = await apiFetch(`/reports/daily-report-compliance${qs}`);
@@ -105,7 +119,7 @@ export const ReportsPage: React.FC = () => {
 
   useEffect(() => {
     loadActiveReport();
-  }, [tab, asOf, from, to, clientId, projectId]);
+  }, [tab, asOf, from, to, companyId, clientId, projectId]);
 
   const switchTab = (next: ReportTab) => {
     setTab(next);
@@ -117,6 +131,7 @@ export const ReportsPage: React.FC = () => {
       if (tab === 'ageing') {
         const qs = buildQueryString({
           asOf,
+          companyId: companyId || undefined,
           clientId: clientId || undefined,
           projectId: projectId || undefined,
           format: 'xlsx',
@@ -126,6 +141,7 @@ export const ReportsPage: React.FC = () => {
         const qs = buildQueryString({
           from: from || undefined,
           to: to || undefined,
+          companyId: companyId || undefined,
           clientId: clientId || undefined,
           format: 'xlsx',
         });
@@ -134,6 +150,7 @@ export const ReportsPage: React.FC = () => {
         const qs = buildQueryString({
           from: from || yearStart,
           to: to || today,
+          companyId: companyId || undefined,
           clientId: clientId || undefined,
           projectId: projectId || undefined,
           format: 'xlsx',
@@ -141,6 +158,7 @@ export const ReportsPage: React.FC = () => {
         await apiDownload(`/reports/billing-collections${qs}`, 'billing-collections.xlsx');
       } else if (tab === 'retention') {
         const qs = buildQueryString({
+          companyId: companyId || undefined,
           clientId: clientId || undefined,
           projectId: projectId || undefined,
           format: 'xlsx',
@@ -150,6 +168,7 @@ export const ReportsPage: React.FC = () => {
         const qs = buildQueryString({
           from: from || firstOfMonth,
           to: to || today,
+          companyId: companyId || undefined,
           projectId: projectId || undefined,
           format: 'xlsx',
         });

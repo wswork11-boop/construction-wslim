@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ClaimCalculator, Role } from '@construction/shared';
 import { apiFetch } from '../lib/api';
 import { authStore } from '../lib/auth';
+import { activeProjectStore } from '../lib/active-project';
 
 export const InvoiceEditorPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -13,13 +14,15 @@ export const InvoiceEditorPage: React.FC = () => {
 
   const [invoice, setInvoice] = useState<any>(null);
   const [project, setProject] = useState<any>(null);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<any[]>([]);
 
   // Simple invoice fields
+  const [companyId, setCompanyId] = useState(activeProjectStore.getCompanyId());
   const [clientId, setClientId] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(activeProjectStore.getProjectId());
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
   const [quotePoRef, setQuotePoRef] = useState('');
   const [claimReportRef, setClaimReportRef] = useState('');
@@ -44,12 +47,18 @@ export const InvoiceEditorPage: React.FC = () => {
   const isEditable = isNew || invoice?.status === 'DRAFT';
 
   const loadLookups = async () => {
-    const [pRes, tRes] = await Promise.all([
+    const [compRes, pRes, tRes] = await Promise.all([
+      apiFetch('/companies').catch(() => ({ items: [] })),
       apiFetch('/projects?pageSize=100'),
       apiFetch('/tax-rates?pageSize=100').catch(() => ({ items: [] })),
     ]);
+    const compList = compRes.items || [];
+    setCompanies(compList);
     setProjects(pRes.items || []);
     setTaxRates(tRes.items || []);
+    if (isNew && !companyId && compList[0]) {
+      setCompanyId(compList[0].id);
+    }
     if (canIssue) {
       const cRes = await apiFetch('/clients?pageSize=100');
       setClients(cRes.items || []);
@@ -61,6 +70,7 @@ export const InvoiceEditorPage: React.FC = () => {
     try {
       const inv = await apiFetch(`/invoices/${targetId}`);
       setInvoice(inv);
+      setCompanyId(inv.companyId || '');
       setClientId(inv.clientId);
       setProjectId(inv.projectId || '');
       setIssueDate(inv.issueDate || new Date().toISOString().slice(0, 10));
@@ -151,6 +161,7 @@ export const InvoiceEditorPage: React.FC = () => {
           body: JSON.stringify({
             type: 'SIMPLE',
             clientId,
+            companyId: companyId || null,
             projectId: projectId || null,
             issueDate: issueDate || null,
             quotePoRef: quotePoRef || null,
@@ -171,6 +182,7 @@ export const InvoiceEditorPage: React.FC = () => {
           method: 'PUT',
           body: JSON.stringify({
             clientId,
+            companyId: companyId || null,
             projectId: projectId || null,
             issueDate: issueDate || null,
             quotePoRef: quotePoRef || null,
@@ -516,6 +528,21 @@ export const InvoiceEditorPage: React.FC = () => {
       ) : (
         <div className="card">
           <div className="grid g3" style={{ gap: 10, marginBottom: 14 }}>
+            <div>
+              <label>Our Company (Billing Entity)</label>
+              <select
+                disabled={!isEditable}
+                value={companyId}
+                onChange={(e) => setCompanyId(e.target.value)}
+              >
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code ? `[${c.code}] ` : ''}
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label>Client</label>
               <select

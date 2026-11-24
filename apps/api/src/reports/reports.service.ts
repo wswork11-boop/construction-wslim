@@ -115,25 +115,83 @@ export class ReportsService {
     private readonly filesService: FilesService,
   ) {}
 
+  private matchesCompanyFilter(
+    recordCompanyId: string | null | undefined,
+    accessibleCompanyIds: string[] | null,
+    filterCompanyId?: string,
+  ): boolean {
+    if (accessibleCompanyIds !== null && accessibleCompanyIds.length > 0) {
+      if (!recordCompanyId || !accessibleCompanyIds.includes(recordCompanyId)) {
+        return false;
+      }
+    }
+    if (filterCompanyId && recordCompanyId !== filterCompanyId) {
+      return false;
+    }
+    return true;
+  }
+
   // ---------------------------------------------------------------------------
   // 1. Dashboard (/reports/dashboard)
   // ---------------------------------------------------------------------------
 
-  async getDashboard(asOfOverride?: string) {
+  async getDashboard(asOfOverride?: string, user?: AuthUser, companyId?: string) {
     const today = asOfOverride || todayKualaLumpur();
     const currentMonth = today.slice(0, 7);
     const yesterday = addDays(today, -1);
 
-    const [projects, quotations, invoices, creditNotes, payments, dailyReports, expenses] =
+    const accessibleCompanyIds = user
+      ? await this.projectAccessService.getAccessibleCompanyIds(user)
+      : null;
+
+    const [allProjects, allQuotations, allInvoices, allCreditNotes, allPayments, dailyReports, allExpenses] =
       await Promise.all([
         this.prisma.project.findMany(),
         this.prisma.quotation.findMany(),
         this.prisma.invoice.findMany({ include: { creditNotes: true } }),
         this.prisma.creditNote.findMany({ include: { invoice: true } }),
-        this.prisma.payment.findMany(),
+        this.prisma.payment.findMany({ include: { allocations: true } }),
         this.prisma.dailyReport.findMany(),
         this.prisma.expense.findMany(),
       ]);
+
+    const projCompanyMap = new Map<string, string | null>(
+      allProjects.map((p: any) => [p.id, p.companyId ?? null]),
+    );
+
+    const projects = allProjects.filter((p: any) =>
+      this.matchesCompanyFilter(p.companyId, accessibleCompanyIds, companyId),
+    );
+    const quotations = allQuotations.filter((q: any) =>
+      this.matchesCompanyFilter(
+        q.companyId ?? (q.projectId ? projCompanyMap.get(q.projectId) : null),
+        accessibleCompanyIds,
+        companyId,
+      ),
+    );
+    const invoices = allInvoices.filter((inv: any) =>
+      this.matchesCompanyFilter(
+        inv.companyId ?? (inv.projectId ? projCompanyMap.get(inv.projectId) : null),
+        accessibleCompanyIds,
+        companyId,
+      ),
+    );
+    const visibleInvoiceIds = new Set(invoices.map((i: any) => i.id));
+    const creditNotes = allCreditNotes.filter((cn: any) => visibleInvoiceIds.has(cn.invoiceId));
+    const payments = allPayments.filter((p: any) => {
+      if (!companyId && (accessibleCompanyIds === null || accessibleCompanyIds.length === 0)) {
+        return true;
+      }
+      const allocs = p.allocations || [];
+      return allocs.some((a: any) => visibleInvoiceIds.has(a.invoiceId));
+    });
+    const expenses = allExpenses.filter((e: any) =>
+      this.matchesCompanyFilter(
+        e.companyId ?? (e.projectId ? projCompanyMap.get(e.projectId) : null),
+        accessibleCompanyIds,
+        companyId,
+      ),
+    );
 
     const activeProjectList = projects.filter((p: any) => p.status === ProjectStatus.ACTIVE);
     const activeProjects = activeProjectList.length;
@@ -427,11 +485,15 @@ export class ReportsService {
   // ---------------------------------------------------------------------------
 
   async getReceivablesAgeing(
-    query: { asOf?: string; clientId?: string; projectId?: string } = {},
+    query: { asOf?: string; clientId?: string; companyId?: string; projectId?: string } = {},
+    user?: AuthUser,
   ) {
     const asOf = query.asOf || todayKualaLumpur();
+    const accessibleCompanyIds = user
+      ? await this.projectAccessService.getAccessibleCompanyIds(user)
+      : null;
     const invoices = await this.prisma.invoice.findMany({
-      include: { client: true },
+      include: { client: true, project: true },
     });
 
     const byClient = new Map<
@@ -449,6 +511,8 @@ export class ReportsService {
 
     for (const inv of invoices) {
       if (!OUTSTANDING_INVOICE_STATUSES.has(inv.status)) continue;
+      const invCompId = inv.companyId ?? inv.project?.companyId ?? null;
+      if (!this.matchesCompanyFilter(invCompId, accessibleCompanyIds, query.companyId)) continue;
       if (query.clientId && inv.clientId !== query.clientId) continue;
       if (query.projectId && inv.projectId !== query.projectId) continue;
 
@@ -527,10 +591,16 @@ export class ReportsService {
   // ---------------------------------------------------------------------------
 
   async getQuotationPipeline(
-    query: { from?: string; to?: string; clientId?: string } = {},
+    query: { from?: string; to?: string; clientId?: string; companyId?: string } = {},
+    user?: AuthUser,
   ) {
     const today = todayKualaLumpur();
-    const all = await this.prisma.quotation.findMany();
+    const accessibleCompanyIds = user
+      ? await this.projectAccessService.getAccessibleCompanyIds(user)
+      : null;
+    const all = await this.prisma.quotation.findMany({
+      include: { project: true },
+    });
 
     // Only the latest revision per quotation rootId
     const latestByRoot = new Map<string, any>();
@@ -543,6 +613,8 @@ export class ReportsService {
 
     const filtered: Array<{ status: string; total: any; month: string }> = [];
     for (const q of latestByRoot.values()) {
+      const qCompId = q.companyId ?? q.project?.companyId ?? null;
+      if (!this.matchesCompanyFilter(qCompId, accessibleCompanyIds, query.companyId)) continue;
       if (query.clientId && q.clientId !== query.clientId) continue;
       const issueDateStr = formatDateOnly(q.issueDate);
       if (!issueDateStr) continue;
@@ -618,7 +690,14 @@ export class ReportsService {
   // ---------------------------------------------------------------------------
 
   async getBillingCollections(
-    query: { from?: string; to?: string; clientId?: string; projectId?: string } = {},
+    query: {
+      from?: string;
+      to?: string;
+      clientId?: string;
+      companyId?: string;
+      projectId?: string;
+    } = {},
+    user?: AuthUser,
   ) {
     const today = todayKualaLumpur();
     const defaultToDate = today;
@@ -630,18 +709,27 @@ export class ReportsService {
     const toMonth = toDate.slice(0, 7);
 
     const monthKeys = listMonthsInRange(fromMonth, toMonth);
+    const accessibleCompanyIds = user
+      ? await this.projectAccessService.getAccessibleCompanyIds(user)
+      : null;
 
     const [invoices, creditNotes, payments] = await Promise.all([
-      this.prisma.invoice.findMany(),
+      this.prisma.invoice.findMany({ include: { project: true } }),
       this.prisma.creditNote.findMany({ include: { invoice: true } }),
       this.prisma.payment.findMany({ include: { allocations: true } }),
     ]);
 
     const invoiceById = new Map<string, any>(invoices.map((i: any) => [i.id, i]));
+    const isInvoiceCompanyMatch = (inv: any) => {
+      if (!inv) return false;
+      const compId = inv.companyId ?? inv.project?.companyId ?? null;
+      return this.matchesCompanyFilter(compId, accessibleCompanyIds, query.companyId);
+    };
 
     // Billed invoices matching filters
     const billedInvoices = invoices.filter((inv: any) => {
       if (!BILLED_INVOICE_STATUSES.has(inv.status)) return false;
+      if (!isInvoiceCompanyMatch(inv)) return false;
       if (query.clientId && inv.clientId !== query.clientId) return false;
       if (query.projectId && inv.projectId !== query.projectId) return false;
       const d = formatDateOnly(inv.issueDate);
@@ -652,8 +740,9 @@ export class ReportsService {
     });
 
     const matchingCreditNotes = creditNotes.filter((cn: any) => {
-      const inv = cn.invoice || invoiceById.get(cn.invoiceId);
+      const inv = invoiceById.get(cn.invoiceId) || cn.invoice;
       if (!inv || !BILLED_INVOICE_STATUSES.has(inv.status)) return false;
+      if (!isInvoiceCompanyMatch(inv)) return false;
       if (query.clientId && inv.clientId !== query.clientId) return false;
       if (query.projectId && inv.projectId !== query.projectId) return false;
       const d = formatDateOnly(cn.issueDate);
@@ -697,11 +786,16 @@ export class ReportsService {
       const m = d.slice(0, 7);
       if (!receivedByMonth.has(m)) continue;
 
-      if (query.projectId) {
-        // When filtering by projectId, sum only allocations to invoices of that project
+      if (query.projectId || query.companyId || (accessibleCompanyIds && accessibleCompanyIds.length > 0)) {
+        // When filtering by projectId or companyId, sum only allocations to matching invoices
         const projAllocTotal = sumMoney(
           (p.allocations || [])
-            .filter((a: any) => invoiceById.get(a.invoiceId)?.projectId === query.projectId)
+            .filter((a: any) => {
+              const inv = invoiceById.get(a.invoiceId);
+              if (!inv || !isInvoiceCompanyMatch(inv)) return false;
+              if (query.projectId && inv.projectId !== query.projectId) return false;
+              return true;
+            })
             .map((a: any) => a.amount),
         );
         receivedByMonth.set(m, receivedByMonth.get(m).add(projAllocTotal));
@@ -733,9 +827,10 @@ export class ReportsService {
 
   async getRetentionRegister(
     user: AuthUser,
-    query: { clientId?: string; projectId?: string } = {},
+    query: { clientId?: string; companyId?: string; projectId?: string } = {},
   ) {
     const allowedIds = await this.projectAccessService.getAccessibleProjectIds(user);
+    const accessibleCompanyIds = await this.projectAccessService.getAccessibleCompanyIds(user);
     const [projects, invoices] = await Promise.all([
       this.prisma.project.findMany({
         include: { client: true },
@@ -760,6 +855,9 @@ export class ReportsService {
     }> = [];
 
     for (const proj of projects) {
+      if (!this.matchesCompanyFilter(proj.companyId, accessibleCompanyIds, query.companyId)) {
+        continue;
+      }
       if (allowedIds !== null && !allowedIds.includes(proj.id)) continue;
       if (query.clientId && proj.clientId !== query.clientId) continue;
       if (query.projectId && proj.id !== query.projectId) continue;
@@ -857,7 +955,7 @@ export class ReportsService {
 
   async getDailyReportCompliance(
     user: AuthUser,
-    query: { from?: string; to?: string; projectId?: string },
+    query: { from?: string; to?: string; companyId?: string; projectId?: string },
   ) {
     if (!query.from || !query.to || query.from > query.to) {
       throw AppException.unprocessable(
@@ -867,6 +965,7 @@ export class ReportsService {
     }
 
     const allowedIds = await this.projectAccessService.getAccessibleProjectIds(user);
+    const accessibleCompanyIds = await this.projectAccessService.getAccessibleCompanyIds(user);
     const [projects, members, dailyReports] = await Promise.all([
       this.prisma.project.findMany({ orderBy: { code: 'asc' } }),
       this.prisma.projectMember.findMany({ include: { user: true } }),
@@ -889,6 +988,9 @@ export class ReportsService {
     }> = [];
 
     for (const proj of projects) {
+      if (!this.matchesCompanyFilter(proj.companyId, accessibleCompanyIds, query.companyId)) {
+        continue;
+      }
       if (allowedIds !== null && !allowedIds.includes(proj.id)) continue;
       if (query.projectId && proj.id !== query.projectId) continue;
       if (proj.status !== ProjectStatus.ACTIVE && !query.projectId) continue;
@@ -975,9 +1077,16 @@ export class ReportsService {
 
   async getExpensesReport(
     user: AuthUser,
-    query: { from?: string; to?: string; projectId?: string; category?: string } = {},
+    query: {
+      from?: string;
+      to?: string;
+      companyId?: string;
+      projectId?: string;
+      category?: string;
+    } = {},
   ) {
     const allowedProjectIds = await this.projectAccessService.getAccessibleProjectIds(user);
+    const accessibleCompanyIds = await this.projectAccessService.getAccessibleCompanyIds(user);
     const all = await this.prisma.expense.findMany({
       include: { project: true },
       orderBy: { expenseDate: 'desc' },
@@ -985,6 +1094,10 @@ export class ReportsService {
 
     const filtered = all.filter((exp: any) => {
       if (exp.status === ExpenseStatus.VOID) return false;
+      const expCompId = exp.companyId ?? exp.project?.companyId ?? null;
+      if (!this.matchesCompanyFilter(expCompId, accessibleCompanyIds, query.companyId)) {
+        return false;
+      }
       if (allowedProjectIds !== null) {
         if (!exp.projectId || !allowedProjectIds.includes(exp.projectId)) return false;
       }

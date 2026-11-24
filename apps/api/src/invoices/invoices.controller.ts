@@ -149,9 +149,9 @@ export class InvoicesController {
 
   @Get('payments')
   @Roles(Role.OWNER, Role.OFFICE)
-  async listPayments(@Query() query: unknown) {
+  async listPayments(@CurrentUser() user: AuthUser, @Query() query: unknown) {
     const parsed = parseWithZod(PaymentListQuerySchema, query);
-    return this.invoicesService.listPayments(parsed);
+    return this.invoicesService.listPayments(user, parsed);
   }
 
   @Post('payments')

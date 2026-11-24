@@ -197,6 +197,9 @@ model Company {
   updatedAt                  DateTime @updatedAt
 
   projects        Project[]
+  quotations      Quotation[]
+  invoices        Invoice[]
+  expenses        Expense[]
   users           User[]
   userMemberships UserCompany[]
 }
@@ -364,6 +367,7 @@ model Quotation {
   rootId          String          @db.Uuid
   revisionNo      Int             @default(0)
   clientId        String          @db.Uuid
+  companyId       String?         @db.Uuid
   projectId       String?         @db.Uuid
   title           String
   status          QuotationStatus @default(DRAFT)
@@ -382,6 +386,7 @@ model Quotation {
   updatedAt       DateTime        @updatedAt
 
   client    Client   @relation(fields: [clientId], references: [id])
+  company   Company? @relation(fields: [companyId], references: [id])
   project   Project? @relation(fields: [projectId], references: [id])
   pdfFile   File?    @relation(fields: [pdfFileId], references: [id])
   createdBy User     @relation(fields: [createdById], references: [id])
@@ -531,6 +536,7 @@ model Invoice {
   id                   String         @id @default(uuid(7)) @db.Uuid
   number               String?        @unique
   type                 InvoiceType
+  companyId            String?        @db.Uuid
   projectId            String?        @db.Uuid
   clientId             String         @db.Uuid
   status               InvoiceStatus  @default(DRAFT)
@@ -579,6 +585,7 @@ model Invoice {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  company        Company?        @relation(fields: [companyId], references: [id])
   project        Project?        @relation(fields: [projectId], references: [id])
   client         Client          @relation(fields: [clientId], references: [id])
   pdfFile        File?           @relation(fields: [pdfFileId], references: [id])
@@ -895,6 +902,7 @@ model EInvoiceSubmission {
 model Expense {
   id               String          @id @default(uuid(7)) @db.Uuid
   number           String          @unique
+  companyId        String?         @db.Uuid
   projectId        String?         @db.Uuid
   projectCodeRef   String?
   category         ExpenseCategory
@@ -919,6 +927,7 @@ model Expense {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
+  company     Company? @relation(fields: [companyId], references: [id])
   project     Project? @relation(fields: [projectId], references: [id])
   taxRate     TaxRate? @relation(fields: [taxRateId], references: [id])
   receiptFile File?    @relation(fields: [receiptFileId], references: [id])

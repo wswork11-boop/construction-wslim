@@ -298,6 +298,7 @@ export type QuotationSectionInput = z.infer<typeof QuotationSectionInputSchema>;
 
 export const QuotationInputSchema = z.object({
   clientId: z.string().uuid(),
+  companyId: z.string().uuid().nullable().optional(),
   projectId: z.string().uuid().nullable().optional(),
   title: z.string().min(1).max(300),
   issueDate: DateStringSchema.nullable().optional(),
@@ -326,6 +327,7 @@ export type QuotationRejectRequest = z.infer<typeof QuotationRejectRequestSchema
 export const QuotationListQuerySchema = PaginationQuerySchema.extend({
   status: QuotationStatusSchema.optional(),
   clientId: z.string().uuid().optional(),
+  companyId: z.string().uuid().optional(),
   projectId: z.string().uuid().optional(),
   from: DateStringSchema.optional(),
   to: DateStringSchema.optional(),
@@ -452,6 +454,7 @@ export type InvoiceLineInput = z.infer<typeof InvoiceLineInputSchema>;
 export const SimpleInvoiceCreateSchema = z.object({
   type: InvoiceTypeSchema,
   clientId: z.string().uuid(),
+  companyId: z.string().uuid().nullable().optional(),
   projectId: z.string().uuid().nullable().optional(),
   issueDate: DateStringSchema.nullable().optional(),
   quotePoRef: z.string().max(100).nullable().optional(),
@@ -463,6 +466,7 @@ export type SimpleInvoiceCreate = z.infer<typeof SimpleInvoiceCreateSchema>;
 
 export const SimpleInvoiceUpdateSchema = z.object({
   clientId: z.string().uuid(),
+  companyId: z.string().uuid().nullable().optional(),
   projectId: z.string().uuid().nullable().optional(),
   issueDate: DateStringSchema.nullable().optional(),
   quotePoRef: z.string().max(100).nullable().optional(),
@@ -537,6 +541,7 @@ export const InvoiceListQuerySchema = PaginationQuerySchema.extend({
   type: InvoiceTypeSchema.optional(),
   status: InvoiceStatusSchema.optional(),
   clientId: z.string().uuid().optional(),
+  companyId: z.string().uuid().optional(),
   projectId: z.string().uuid().optional(),
   from: DateStringSchema.optional(),
   to: DateStringSchema.optional(),
@@ -574,6 +579,7 @@ export type PaymentCreate = z.infer<typeof PaymentCreateSchema>;
 
 export const PaymentListQuerySchema = PaginationQuerySchema.extend({
   clientId: z.string().uuid().optional(),
+  companyId: z.string().uuid().optional(),
   invoiceId: z.string().uuid().optional(),
   from: DateStringSchema.optional(),
   to: DateStringSchema.optional(),
@@ -582,6 +588,7 @@ export const PaymentListQuerySchema = PaginationQuerySchema.extend({
 export const CsvExportQuerySchema = z.object({
   from: DateStringSchema,
   to: DateStringSchema,
+  companyId: z.string().uuid().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -590,6 +597,7 @@ export const CsvExportQuerySchema = z.object({
 
 export const ExpenseCreateSchema = z.object({
   projectId: z.string().uuid().nullable().optional(),
+  companyId: z.string().uuid().nullable().optional(),
   category: ExpenseCategorySchema,
   status: z.enum(['UNPAID', 'PAID', 'REIMBURSED']).default('UNPAID'),
   expenseDate: DateStringSchema,
@@ -608,6 +616,7 @@ export type ExpenseCreate = z.infer<typeof ExpenseCreateSchema>;
 
 export const ExpenseUpdateSchema = z.object({
   projectId: z.string().uuid().nullable().optional(),
+  companyId: z.string().uuid().nullable().optional(),
   category: ExpenseCategorySchema,
   expenseDate: DateStringSchema,
   vendorName: z.string().min(1).max(200),
@@ -635,6 +644,7 @@ export type ExpenseVoid = z.infer<typeof ExpenseVoidSchema>;
 
 export const ExpenseListQuerySchema = PaginationQuerySchema.extend({
   projectId: z.string().uuid().optional(),
+  companyId: z.string().uuid().optional(),
   category: ExpenseCategorySchema.optional(),
   status: ExpenseStatusSchema.optional(),
   from: DateStringSchema.optional(),

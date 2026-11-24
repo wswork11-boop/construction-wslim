@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { apiFetch } from '../lib/api';
+import { activeProjectStore } from '../lib/active-project';
 
 export const PaymentsPage: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [clientInvoices, setClientInvoices] = useState<any[]>([]);
+  const [activeCompanyId, setActiveCompanyId] = useState(activeProjectStore.getCompanyId());
 
   const [clientId, setClientId] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0, 10));
@@ -14,10 +16,17 @@ export const PaymentsPage: React.FC = () => {
   const [allocMap, setAllocMap] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = async () => {
+  useEffect(() => {
+    return activeProjectStore.subscribe(() => {
+      setActiveCompanyId(activeProjectStore.getCompanyId());
+    });
+  }, []);
+
+  const loadData = async (compId = activeCompanyId) => {
     try {
+      const compQs = compId ? `&companyId=${compId}` : '';
       const [pRes, cRes] = await Promise.all([
-        apiFetch('/payments?pageSize=100'),
+        apiFetch(`/payments?pageSize=100${compQs}`),
         apiFetch('/clients?pageSize=100'),
       ]);
       setPayments(pRes.items || []);
@@ -31,19 +40,20 @@ export const PaymentsPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadData();
-  }, []);
+    loadData(activeCompanyId);
+  }, [activeCompanyId]);
 
   useEffect(() => {
     if (!clientId) return;
-    apiFetch(`/invoices?clientId=${clientId}&pageSize=100`).then((res) => {
+    const compQs = activeCompanyId ? `&companyId=${activeCompanyId}` : '';
+    apiFetch(`/invoices?clientId=${clientId}&pageSize=100${compQs}`).then((res) => {
       const payable = (res.items || []).filter(
         (i: any) => i.status === 'ISSUED' || i.status === 'PARTIALLY_PAID',
       );
       setClientInvoices(payable);
       setAllocMap({});
     });
-  }, [clientId]);
+  }, [clientId, activeCompanyId]);
 
   const handleSavePayment = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { QuotationCalculator } from '@construction/shared';
 import { apiFetch } from '../lib/api';
+import { activeProjectStore } from '../lib/active-project';
 
 interface EditableItem {
   id?: string;
@@ -25,12 +26,14 @@ export const QuotationEditorPage: React.FC = () => {
 
   const [quotation, setQuotation] = useState<any>(null);
   const [revisions, setRevisions] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<any[]>([]);
 
+  const [companyId, setCompanyId] = useState(activeProjectStore.getCompanyId());
   const [clientId, setClientId] = useState('');
-  const [projectId, setProjectId] = useState('');
+  const [projectId, setProjectId] = useState(activeProjectStore.getProjectId());
   const [title, setTitle] = useState('');
   const [issueDate, setIssueDate] = useState(new Date().toISOString().slice(0, 10));
   const [validUntil, setValidUntil] = useState('');
@@ -51,16 +54,20 @@ export const QuotationEditorPage: React.FC = () => {
   const isEditable = isNew || quotation?.status === 'DRAFT';
 
   const loadLookups = async () => {
-    const [cRes, pRes, tRes] = await Promise.all([
+    const [compRes, cRes, pRes, tRes] = await Promise.all([
+      apiFetch('/companies').catch(() => ({ items: [] })),
       apiFetch('/clients?pageSize=100'),
       apiFetch('/projects?pageSize=100'),
       apiFetch('/tax-rates?pageSize=100'),
     ]);
+    const compList = compRes.items || [];
+    setCompanies(compList);
     setClients(cRes.items || []);
     setProjects(pRes.items || []);
     setTaxRates(tRes.items || []);
-    if (isNew && cRes.items?.[0]) {
-      setClientId(cRes.items[0].id);
+    if (isNew) {
+      if (cRes.items?.[0]) setClientId(cRes.items[0].id);
+      if (!companyId && compList[0]) setCompanyId(compList[0].id);
     }
   };
 
@@ -68,6 +75,7 @@ export const QuotationEditorPage: React.FC = () => {
     try {
       const q = await apiFetch(`/quotations/${targetId}`);
       setQuotation(q);
+      setCompanyId(q.companyId || '');
       setClientId(q.clientId);
       setProjectId(q.projectId || '');
       setTitle(q.title);
@@ -128,6 +136,7 @@ export const QuotationEditorPage: React.FC = () => {
 
   const buildPayload = () => ({
     clientId,
+    companyId: companyId || null,
     projectId: projectId || null,
     title,
     issueDate: issueDate || null,
@@ -330,6 +339,21 @@ export const QuotationEditorPage: React.FC = () => {
       <div className="split">
         <div>
           <div className="card grid g3" style={{ gap: 10 }}>
+            <div>
+              <label>Our Company (Billing Entity)</label>
+              <select
+                disabled={!isEditable}
+                value={companyId}
+                onChange={(e) => setCompanyId(e.target.value)}
+              >
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code ? `[${c.code}] ` : ''}
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label>Client</label>
               <select

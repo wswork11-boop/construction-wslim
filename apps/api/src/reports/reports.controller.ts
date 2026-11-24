@@ -29,11 +29,13 @@ export class ReportsController {
   @Get('dashboard')
   @Roles(Role.OWNER, Role.OFFICE)
   async getDashboard(
+    @CurrentUser() user: AuthUser,
     @Query('format') format: string | undefined,
     @Query('asOf') asOf: string | undefined,
+    @Query('companyId') companyId: string | undefined,
     @Res() res: any,
   ) {
-    const data = await this.reportsService.getDashboard(asOf);
+    const data = await this.reportsService.getDashboard(asOf, user, companyId);
     this.sendJsonOrXlsx(res, format, data, 'dashboard-report.xlsx', () =>
       this.reportsService.buildDashboardXlsx(data),
     );
@@ -62,13 +64,18 @@ export class ReportsController {
   @Get('receivables-ageing')
   @Roles(Role.OWNER, Role.OFFICE)
   async getReceivablesAgeing(
+    @CurrentUser() user: AuthUser,
     @Query('asOf') asOf: string | undefined,
     @Query('clientId') clientId: string | undefined,
+    @Query('companyId') companyId: string | undefined,
     @Query('projectId') projectId: string | undefined,
     @Query('format') format: string | undefined,
     @Res() res: any,
   ) {
-    const data = await this.reportsService.getReceivablesAgeing({ asOf, clientId, projectId });
+    const data = await this.reportsService.getReceivablesAgeing(
+      { asOf, clientId, companyId, projectId },
+      user,
+    );
     this.sendJsonOrXlsx(
       res,
       format,
@@ -81,13 +88,18 @@ export class ReportsController {
   @Get('quotation-pipeline')
   @Roles(Role.OWNER, Role.OFFICE)
   async getQuotationPipeline(
+    @CurrentUser() user: AuthUser,
     @Query('from') from: string | undefined,
     @Query('to') to: string | undefined,
     @Query('clientId') clientId: string | undefined,
+    @Query('companyId') companyId: string | undefined,
     @Query('format') format: string | undefined,
     @Res() res: any,
   ) {
-    const data = await this.reportsService.getQuotationPipeline({ from, to, clientId });
+    const data = await this.reportsService.getQuotationPipeline(
+      { from, to, clientId, companyId },
+      user,
+    );
     this.sendJsonOrXlsx(res, format, data, 'quotation-pipeline.xlsx', () =>
       this.reportsService.buildQuotationPipelineXlsx(data),
     );
@@ -96,19 +108,25 @@ export class ReportsController {
   @Get('billing-collections')
   @Roles(Role.OWNER, Role.OFFICE)
   async getBillingCollections(
+    @CurrentUser() user: AuthUser,
     @Query('from') from: string | undefined,
     @Query('to') to: string | undefined,
     @Query('clientId') clientId: string | undefined,
+    @Query('companyId') companyId: string | undefined,
     @Query('projectId') projectId: string | undefined,
     @Query('format') format: string | undefined,
     @Res() res: any,
   ) {
-    const data = await this.reportsService.getBillingCollections({
-      from,
-      to,
-      clientId,
-      projectId,
-    });
+    const data = await this.reportsService.getBillingCollections(
+      {
+        from,
+        to,
+        clientId,
+        companyId,
+        projectId,
+      },
+      user,
+    );
     this.sendJsonOrXlsx(res, format, data, 'billing-collections.xlsx', () =>
       this.reportsService.buildBillingCollectionsXlsx(data),
     );
@@ -119,11 +137,16 @@ export class ReportsController {
   async getRetentionRegister(
     @CurrentUser() user: AuthUser,
     @Query('clientId') clientId: string | undefined,
+    @Query('companyId') companyId: string | undefined,
     @Query('projectId') projectId: string | undefined,
     @Query('format') format: string | undefined,
     @Res() res: any,
   ) {
-    const data = await this.reportsService.getRetentionRegister(user, { clientId, projectId });
+    const data = await this.reportsService.getRetentionRegister(user, {
+      clientId,
+      companyId,
+      projectId,
+    });
     this.sendJsonOrXlsx(res, format, data, 'retention-register.xlsx', () =>
       this.reportsService.buildRetentionRegisterXlsx(data),
     );
@@ -135,6 +158,7 @@ export class ReportsController {
     @CurrentUser() user: AuthUser,
     @Query('from') from: string | undefined,
     @Query('to') to: string | undefined,
+    @Query('companyId') companyId: string | undefined,
     @Query('projectId') projectId: string | undefined,
     @Query('format') format: string | undefined,
     @Res() res: any,
@@ -142,6 +166,7 @@ export class ReportsController {
     const data = await this.reportsService.getDailyReportCompliance(user, {
       from,
       to,
+      companyId,
       projectId,
     });
     this.sendJsonOrXlsx(
@@ -159,6 +184,7 @@ export class ReportsController {
     @CurrentUser() user: AuthUser,
     @Query('from') from: string | undefined,
     @Query('to') to: string | undefined,
+    @Query('companyId') companyId: string | undefined,
     @Query('projectId') projectId: string | undefined,
     @Query('category') category: string | undefined,
     @Query('format') format: string | undefined,
@@ -167,6 +193,7 @@ export class ReportsController {
     const data = await this.reportsService.getExpensesReport(user, {
       from,
       to,
+      companyId,
       projectId,
       category,
     });

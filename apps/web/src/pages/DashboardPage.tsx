@@ -3,23 +3,32 @@ import { Link } from 'react-router-dom';
 import { Role } from '@construction/shared';
 import { apiDownload, apiFetch } from '../lib/api';
 import { authStore } from '../lib/auth';
+import { activeProjectStore } from '../lib/active-project';
 
 export const DashboardPage: React.FC = () => {
   const { user } = authStore.getState();
   const isOwnerOrOffice = user?.role === Role.OWNER || user?.role === Role.OFFICE;
 
+  const [activeCompanyId, setActiveCompanyId] = useState(activeProjectStore.getCompanyId());
   const [dashboard, setDashboard] = useState<any>(null);
   const [ageing, setAgeing] = useState<any>(null);
   const [billing, setBilling] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const loadDashboard = async () => {
+  useEffect(() => {
+    return activeProjectStore.subscribe(() => {
+      setActiveCompanyId(activeProjectStore.getCompanyId());
+    });
+  }, []);
+
+  const loadDashboard = async (compId = activeCompanyId) => {
     if (!isOwnerOrOffice) return;
     try {
+      const qs = compId ? `?companyId=${compId}` : '';
       const [d, a, b] = await Promise.all([
-        apiFetch('/reports/dashboard'),
-        apiFetch('/reports/receivables-ageing'),
-        apiFetch('/reports/billing-collections'),
+        apiFetch(`/reports/dashboard${qs}`),
+        apiFetch(`/reports/receivables-ageing${qs}`),
+        apiFetch(`/reports/billing-collections${qs}`),
       ]);
       setDashboard(d);
       setAgeing(a);
@@ -30,8 +39,8 @@ export const DashboardPage: React.FC = () => {
   };
 
   useEffect(() => {
-    loadDashboard();
-  }, []);
+    loadDashboard(activeCompanyId);
+  }, [activeCompanyId]);
 
   if (!isOwnerOrOffice) {
     return (
@@ -56,7 +65,12 @@ export const DashboardPage: React.FC = () => {
         </Link>
         <button
           className="btn pri"
-          onClick={() => apiDownload('/reports/dashboard?format=xlsx', 'dashboard-report.xlsx')}
+          onClick={() =>
+            apiDownload(
+              `/reports/dashboard?format=xlsx${activeCompanyId ? `&companyId=${activeCompanyId}` : ''}`,
+              'dashboard-report.xlsx',
+            )
+          }
         >
           Export Excel
         </button>

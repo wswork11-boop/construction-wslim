@@ -299,6 +299,11 @@ export class InMemoryDatabase {
       if (include.client) {
         copy.client = this.clients.find((c) => c.id === row.clientId) || null;
       }
+      if (include.company) {
+        copy.company = row.companyId
+          ? this.companies.find((c) => c.id === row.companyId) || null
+          : null;
+      }
       if (include.project) {
         copy.project = row.projectId
           ? this.projects.find((p) => p.id === row.projectId) || null
@@ -339,6 +344,11 @@ export class InMemoryDatabase {
     } else if (tableName === 'invoice') {
       if (include.client) {
         copy.client = this.clients.find((c) => c.id === row.clientId) || null;
+      }
+      if (include.company) {
+        copy.company = row.companyId
+          ? this.companies.find((c) => c.id === row.companyId) || null
+          : null;
       }
       if (include.project) {
         copy.project = row.projectId
@@ -434,6 +444,11 @@ export class InMemoryDatabase {
         copy.inspector = this.users.find((u) => u.id === row.inspectorId) || null;
       }
     } else if (tableName === 'expense') {
+      if (include.company) {
+        copy.company = row.companyId
+          ? this.companies.find((c) => c.id === row.companyId) || null
+          : null;
+      }
       if (include.project) {
         copy.project = row.projectId
           ? this.projects.find((p) => p.id === row.projectId) || null
@@ -814,6 +829,7 @@ export class InMemoryDatabase {
           rootId: d.rootId,
           revisionNo: Number(d.revisionNo ?? 0),
           clientId: d.clientId,
+          companyId: d.companyId ?? null,
           projectId: d.projectId ?? null,
           title: d.title,
           status: d.status ?? 'DRAFT',
@@ -943,6 +959,7 @@ export class InMemoryDatabase {
           id: d.id ?? uuidv7(),
           number: d.number ?? null,
           type: d.type,
+          companyId: d.companyId ?? null,
           projectId: d.projectId ?? null,
           clientId: d.clientId,
           status: d.status ?? 'DRAFT',
@@ -1227,6 +1244,7 @@ export class InMemoryDatabase {
         (d) => ({
           id: d.id ?? uuidv7(),
           number: d.number,
+          companyId: d.companyId ?? null,
           projectId: d.projectId ?? null,
           projectCodeRef: d.projectCodeRef ?? null,
           category: d.category,

@@ -65,6 +65,8 @@ export class QuotationsService {
   }
 
   serializeSummary(q: any) {
+    const resolvedCompany = q.company || q.project?.company || null;
+    const resolvedCompanyId = q.companyId ?? q.project?.companyId ?? resolvedCompany?.id ?? null;
     return {
       id: q.id,
       number: q.number,
@@ -72,6 +74,16 @@ export class QuotationsService {
       rootId: q.rootId,
       revisionNo: q.revisionNo,
       clientId: q.clientId,
+      companyId: resolvedCompanyId,
+      ...(resolvedCompany
+        ? {
+            company: {
+              id: resolvedCompany.id,
+              code: resolvedCompany.code ?? null,
+              name: resolvedCompany.name,
+            },
+          }
+        : {}),
       ...(q.client
         ? {
             client: {
@@ -160,6 +172,7 @@ export class QuotationsService {
     query: PaginationQuery & {
       status?: QuotationStatus;
       clientId?: string;
+      companyId?: string;
       projectId?: string;
       from?: string;
       to?: string;
@@ -167,9 +180,11 @@ export class QuotationsService {
     },
   ) {
     const all = await this.prisma.quotation.findMany({
-      include: { client: true },
+      include: { client: true, company: true, project: { include: { company: true } } },
       orderBy: { createdAt: 'desc' },
     });
+
+    const accessibleCompanyIds = await this.projectAccessService.getAccessibleCompanyIds(user);
 
     let allowedProjectIds: Set<string> | null = null;
     if (user.role === Role.PROJECT_MANAGER) {
@@ -180,6 +195,13 @@ export class QuotationsService {
     }
 
     let filtered = all.filter((q: any) => {
+      const qCompId = q.companyId ?? q.project?.companyId ?? null;
+      if (accessibleCompanyIds !== null && accessibleCompanyIds.length > 0) {
+        if (!qCompId || !accessibleCompanyIds.includes(qCompId)) {
+          return false;
+        }
+      }
+      if (query.companyId && qCompId !== query.companyId) return false;
       if (allowedProjectIds && (!q.projectId || !allowedProjectIds.has(q.projectId))) {
         return false;
       }
@@ -229,7 +251,12 @@ export class QuotationsService {
     const db = tx || this.prisma;
     const q = await db.quotation.findUnique({
       where: { id },
-      include: { client: true, sections: { include: { items: true } } },
+      include: {
+        client: true,
+        company: true,
+        project: { include: { company: true } },
+        sections: { include: { items: true } },
+      },
     });
     if (!q) {
       throw AppException.notFound('NOT_FOUND', 'Quotation not found');
@@ -253,6 +280,12 @@ export class QuotationsService {
     }
 
     const clientCode = deriveClientCode(client.name, client.code);
+    const project = dto.projectId
+      ? await this.prisma.project.findUnique({ where: { id: dto.projectId } })
+      : null;
+    const fallbackCompany = await this.companyService.getCompany(user);
+    const resolvedCompanyId = dto.companyId ?? project?.companyId ?? fallbackCompany.id;
+
     const taxRateMap = await this.resolveTaxRates(dto.sections);
     const calculated = QuotationCalculator.calculate({
       discountAmount: dto.discountAmount ?? '0.00',
@@ -284,6 +317,7 @@ export class QuotationsService {
           rootId: id,
           revisionNo: 0,
           clientId: dto.clientId,
+          companyId: resolvedCompanyId,
           projectId: dto.projectId ?? null,
           title: dto.title.trim(),
           status: QuotationStatus.DRAFT,
@@ -391,6 +425,7 @@ export class QuotationsService {
         where: { id },
         data: {
           clientId: dto.clientId,
+          ...(dto.companyId !== undefined ? { companyId: dto.companyId } : {}),
           projectId: dto.projectId ?? null,
           title: dto.title.trim(),
           issueDate: dto.issueDate ? new Date(dto.issueDate) : existing.issueDate,
@@ -496,11 +531,13 @@ export class QuotationsService {
       );
     }
 
-    const company = await this.companyService.getCompany();
-    const client = await this.prisma.client.findUnique({ where: { id: quotation.clientId } });
     const project = quotation.projectId
       ? await this.prisma.project.findUnique({ where: { id: quotation.projectId } })
       : null;
+    const company = await this.companyService.getCompanyById(
+      quotation.companyId ?? project?.companyId,
+    );
+    const client = await this.prisma.client.findUnique({ where: { id: quotation.clientId } });
 
     const html = this.pdfService.renderQuotationHtml({
       company,
@@ -579,7 +616,7 @@ export class QuotationsService {
       );
     }
 
-    const company = await this.companyService.getCompany();
+    const company = await this.companyService.getCompanyById(q.companyId);
 
     return this.prisma.$transaction(async (tx: any) => {
       let targetProjectId = q.projectId;
@@ -594,6 +631,7 @@ export class QuotationsService {
               code: derivedCode,
               name: q.title,
               clientId: q.clientId,
+              companyId: q.companyId ?? company.id,
               contractQuotationId: q.id,
               contractQuoteRef,
               poNumber: opts?.poNumber ?? null,
@@ -739,6 +777,7 @@ export class QuotationsService {
           rootId: rawSource.rootId,
           revisionNo: newRevNo,
           clientId: rawSource.clientId,
+          companyId: rawSource.companyId ?? null,
           projectId: rawSource.projectId,
           title: rawSource.title,
           status: QuotationStatus.DRAFT,
@@ -820,6 +859,7 @@ export class QuotationsService {
           rootId: newId,
           revisionNo: 0,
           clientId: rawSource.clientId,
+          companyId: rawSource.companyId ?? null,
           projectId: rawSource.projectId,
           title: rawSource.title,
           status: QuotationStatus.DRAFT,
@@ -903,11 +943,13 @@ export class QuotationsService {
       return this.filesService.getDownloadUrl(quotation.pdfFileId);
     }
 
-    const company = await this.companyService.getCompany();
-    const client = await this.prisma.client.findUnique({ where: { id: quotation.clientId } });
     const project = quotation.projectId
       ? await this.prisma.project.findUnique({ where: { id: quotation.projectId } })
       : null;
+    const company = await this.companyService.getCompanyById(
+      quotation.companyId ?? project?.companyId,
+    );
+    const client = await this.prisma.client.findUnique({ where: { id: quotation.clientId } });
 
     const html = this.pdfService.renderQuotationHtml({
       company,

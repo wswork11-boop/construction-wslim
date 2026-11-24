@@ -66,10 +66,22 @@ export class InvoicesService {
   ) {}
 
   serializeSummary(inv: any) {
+    const resolvedCompany = inv.company || inv.project?.company || null;
+    const resolvedCompanyId = inv.companyId ?? inv.project?.companyId ?? resolvedCompany?.id ?? null;
     return {
       id: inv.id,
       number: inv.number ?? null,
       type: inv.type,
+      companyId: resolvedCompanyId,
+      ...(resolvedCompany
+        ? {
+            company: {
+              id: resolvedCompany.id,
+              code: resolvedCompany.code ?? null,
+              name: resolvedCompany.name,
+            },
+          }
+        : {}),
       projectId: inv.projectId ?? null,
       ...(inv.project
         ? {
@@ -361,12 +373,15 @@ export class InvoicesService {
       type?: InvoiceType;
       status?: InvoiceStatus;
       clientId?: string;
+      companyId?: string;
       projectId?: string;
       from?: string;
       to?: string;
       overdue?: boolean;
     },
   ) {
+    const accessibleCompanyIds = await this.projectAccessService.getAccessibleCompanyIds(user);
+
     let allowedProjectIds: Set<string> | null = null;
     if (user.role === Role.PROJECT_MANAGER) {
       const mems = await this.prisma.projectMember.findMany({ where: { userId: user.id } });
@@ -374,12 +389,19 @@ export class InvoicesService {
     }
 
     const all = await this.prisma.invoice.findMany({
-      include: { client: true, project: true },
+      include: { client: true, company: true, project: { include: { company: true } } },
       orderBy: { createdAt: 'desc' },
     });
 
     const todayStr = getKlTodayString();
     const filtered = all.filter((inv: any) => {
+      const invCompId = inv.companyId ?? inv.project?.companyId ?? null;
+      if (accessibleCompanyIds !== null && accessibleCompanyIds.length > 0) {
+        if (!invCompId || !accessibleCompanyIds.includes(invCompId)) {
+          return false;
+        }
+      }
+      if (query.companyId && invCompId !== query.companyId) return false;
       if (allowedProjectIds && (!inv.projectId || !allowedProjectIds.has(inv.projectId))) {
         return false;
       }
@@ -422,7 +444,8 @@ export class InvoicesService {
       where: { id },
       include: {
         client: true,
-        project: true,
+        company: true,
+        project: { include: { company: true } },
         lines: true,
         claimLines: true,
         creditNotes: true,
@@ -463,6 +486,8 @@ export class InvoicesService {
     const project = dto.projectId
       ? await this.prisma.project.findUnique({ where: { id: dto.projectId } })
       : null;
+    const fallbackCompany = await this.companyService.getCompany(user);
+    const resolvedCompanyId = dto.companyId ?? project?.companyId ?? fallbackCompany.id;
 
     const calcLines = await Promise.all(
       dto.lines.map(async (l, idx) => {
@@ -506,6 +531,7 @@ export class InvoicesService {
           id,
           type: InvoiceType.SIMPLE,
           clientId: dto.clientId,
+          companyId: resolvedCompanyId,
           projectId: dto.projectId ?? null,
           status: InvoiceStatus.DRAFT,
           issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
@@ -680,6 +706,7 @@ export class InvoicesService {
         data: {
           id,
           type: InvoiceType.PROGRESS_CLAIM,
+          companyId: project.companyId ?? null,
           projectId,
           clientId: project.clientId,
           status: InvoiceStatus.DRAFT,
@@ -822,6 +849,7 @@ export class InvoicesService {
         data: {
           id,
           type: InvoiceType.RETENTION_RELEASE,
+          companyId: project.companyId ?? null,
           projectId,
           clientId: project.clientId,
           status: InvoiceStatus.DRAFT,
@@ -949,6 +977,7 @@ export class InvoicesService {
           where: { id },
           data: {
             clientId: dto.clientId,
+            ...(dto.companyId !== undefined ? { companyId: dto.companyId } : {}),
             projectId: dto.projectId ?? null,
             issueDate: dto.issueDate ? new Date(dto.issueDate) : null,
             ...refs,
@@ -1203,7 +1232,7 @@ export class InvoicesService {
     const project = inv.projectId
       ? await this.prisma.project.findUnique({ where: { id: inv.projectId } })
       : null;
-    const company = await this.companyService.getCompanyById(project?.companyId);
+    const company = await this.companyService.getCompanyById(inv.companyId ?? project?.companyId);
 
     const issueDateYmd = inv.issueDate || getKlTodayString();
     const dueDateYmd = addDaysToYmd(issueDateYmd, company.defaultPaymentTermDays);
@@ -1351,7 +1380,7 @@ export class InvoicesService {
     const project = inv.projectId
       ? await this.prisma.project.findUnique({ where: { id: inv.projectId } })
       : null;
-    const company = await this.companyService.getCompanyById(project?.companyId);
+    const company = await this.companyService.getCompanyById(inv.companyId ?? project?.companyId);
 
     const html = this.pdfService.renderInvoiceHtml({
       company,
@@ -1486,19 +1515,50 @@ export class InvoicesService {
   }
 
   async listPayments(
+    user: AuthUser,
     query: PaginationQuery & {
       clientId?: string;
+      companyId?: string;
       invoiceId?: string;
       from?: string;
       to?: string;
     },
   ) {
-    const all = await this.prisma.payment.findMany({
-      include: { client: true, allocations: true },
-      orderBy: { receivedDate: 'desc' },
-    });
+    const accessibleCompanyIds = await this.projectAccessService.getAccessibleCompanyIds(user);
+    const [all, invoices] = await Promise.all([
+      this.prisma.payment.findMany({
+        include: { client: true, allocations: true },
+        orderBy: { receivedDate: 'desc' },
+      }),
+      this.prisma.invoice.findMany({
+        include: { project: true },
+      }),
+    ]);
+
+    const invoiceCompanyMap = new Map<string, string | null>();
+    for (const inv of invoices) {
+      invoiceCompanyMap.set(inv.id, inv.companyId ?? inv.project?.companyId ?? null);
+    }
 
     const filtered = all.filter((p: any) => {
+      if (accessibleCompanyIds !== null && accessibleCompanyIds.length > 0) {
+        const allocs = p.allocations || [];
+        if (
+          allocs.length > 0 &&
+          !allocs.some((a: any) => {
+            const cid = invoiceCompanyMap.get(a.invoiceId);
+            return cid && accessibleCompanyIds.includes(cid);
+          })
+        ) {
+          return false;
+        }
+      }
+      if (query.companyId) {
+        const allocs = p.allocations || [];
+        if (!allocs.some((a: any) => invoiceCompanyMap.get(a.invoiceId) === query.companyId)) {
+          return false;
+        }
+      }
       if (query.clientId && p.clientId !== query.clientId) return false;
       if (query.invoiceId) {
         const hasAlloc = (p.allocations || []).some((a: any) => a.invoiceId === query.invoiceId);

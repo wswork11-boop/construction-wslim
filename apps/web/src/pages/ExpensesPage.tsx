@@ -31,10 +31,12 @@ export const ExpensesPage: React.FC = () => {
     totalUnpaid: '0.00',
   });
   const [projects, setProjects] = useState<any[]>([]);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [taxRates, setTaxRates] = useState<any[]>([]);
 
   // Filters
   const [q, setQ] = useState('');
+  const [companyIdFilter, setCompanyIdFilter] = useState(activeProjectStore.getCompanyId());
   const [projectIdFilter, setProjectIdFilter] = useState(
     searchParams.get('projectId') || activeProjectStore.getProjectId(),
   );
@@ -45,15 +47,19 @@ export const ExpensesPage: React.FC = () => {
 
   // Create form
   const [showCreate, setShowCreate] = useState(false);
+  const [companyId, setCompanyId] = useState(activeProjectStore.getCompanyId());
   const [projectId, setProjectId] = useState(
     searchParams.get('projectId') || activeProjectStore.getProjectId(),
   );
 
   useEffect(() => {
     return activeProjectStore.subscribe(() => {
-      const next = activeProjectStore.getProjectId();
-      setProjectIdFilter(next);
-      if (next) setProjectId(next);
+      const nextComp = activeProjectStore.getCompanyId();
+      const nextProj = activeProjectStore.getProjectId();
+      setCompanyIdFilter(nextComp);
+      if (nextComp) setCompanyId(nextComp);
+      setProjectIdFilter(nextProj);
+      if (nextProj) setProjectId(nextProj);
     });
   }, []);
   const [category, setCategory] = useState<string>(ExpenseCategory.MATERIALS);
@@ -74,10 +80,14 @@ export const ExpensesPage: React.FC = () => {
 
   const loadLookups = async () => {
     try {
-      const [pRes, tRes] = await Promise.all([
+      const [compRes, pRes, tRes] = await Promise.all([
+        apiFetch('/companies').catch(() => ({ items: [] })),
         apiFetch('/projects?pageSize=100'),
         apiFetch('/tax-rates'),
       ]);
+      const compList = compRes.items || [];
+      setCompanies(compList);
+      if (!companyId && compList[0]) setCompanyId(compList[0].id);
       setProjects(pRes.items || []);
       setTaxRates(tRes.items || []);
     } catch {
@@ -90,6 +100,7 @@ export const ExpensesPage: React.FC = () => {
     try {
       const params = new URLSearchParams({ pageSize: '100' });
       if (q.trim()) params.set('q', q.trim());
+      if (companyIdFilter) params.set('companyId', companyIdFilter);
       if (projectIdFilter) params.set('projectId', projectIdFilter);
       if (categoryFilter) params.set('category', categoryFilter);
       if (statusFilter) params.set('status', statusFilter);
@@ -110,7 +121,7 @@ export const ExpensesPage: React.FC = () => {
 
   useEffect(() => {
     loadExpenses();
-  }, [q, projectIdFilter, categoryFilter, statusFilter, fromFilter, toFilter]);
+  }, [q, companyIdFilter, projectIdFilter, categoryFilter, statusFilter, fromFilter, toFilter]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,6 +137,7 @@ export const ExpensesPage: React.FC = () => {
       await apiFetch('/expenses', {
         method: 'POST',
         body: JSON.stringify({
+          companyId: companyId || null,
           projectId: projectId || null,
           category,
           status: initialStatus,
@@ -263,6 +275,17 @@ export const ExpensesPage: React.FC = () => {
         <div className="card">
           <h2>Record Expense / Purchase</h2>
           <form onSubmit={handleCreate} className="grid g4" style={{ gap: 10 }}>
+            <div>
+              <label>Our Company</label>
+              <select value={companyId} onChange={(e) => setCompanyId(e.target.value)}>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code ? `[${c.code}] ` : ''}
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
               <label>Project (Link to P26-NNN)</label>
               <select
@@ -444,6 +467,7 @@ export const ExpensesPage: React.FC = () => {
             <tr>
               <th>Number</th>
               <th>Date</th>
+              <th>Our Company</th>
               <th>Project Ref</th>
               <th>Category</th>
               <th>Vendor / Shop</th>
@@ -458,6 +482,16 @@ export const ExpensesPage: React.FC = () => {
               <tr key={exp.id}>
                 <td className="bold">{exp.number}</td>
                 <td>{exp.expenseDate}</td>
+                <td>
+                  {exp.company ? (
+                    <span className="pill">
+                      {exp.company.code ? `[${exp.company.code}] ` : ''}
+                      {exp.company.name}
+                    </span>
+                  ) : (
+                    <span className="small muted">-</span>
+                  )}
+                </td>
                 <td>
                   {exp.projectId ? (
                     <Link to={`/projects/${exp.projectId}`} className="pill info">

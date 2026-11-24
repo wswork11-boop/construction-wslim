@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Role } from '@construction/shared';
 import { apiFetch } from '../lib/api';
 import { authStore } from '../lib/auth';
+import { activeProjectStore } from '../lib/active-project';
 
 export const InvoicesPage: React.FC = () => {
   const navigate = useNavigate();
@@ -12,13 +13,22 @@ export const InvoicesPage: React.FC = () => {
   const [invoices, setInvoices] = useState<any[]>([]);
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState(activeProjectStore.getCompanyId());
+  const [projectFilter, setProjectFilter] = useState(activeProjectStore.getProjectId());
   const [error, setError] = useState<string | null>(null);
 
-  const loadInvoices = async (search = q, st = statusFilter) => {
+  const loadInvoices = async (
+    search = q,
+    st = statusFilter,
+    comp = companyFilter,
+    proj = projectFilter,
+  ) => {
     try {
       const params = new URLSearchParams({ pageSize: '100' });
       if (search) params.set('q', search);
       if (st) params.set('status', st);
+      if (comp) params.set('companyId', comp);
+      if (proj) params.set('projectId', proj);
       const res = await apiFetch(`/invoices?${params.toString()}`);
       setInvoices(res.items || []);
     } catch (err: any) {
@@ -29,6 +39,16 @@ export const InvoicesPage: React.FC = () => {
   useEffect(() => {
     loadInvoices();
   }, []);
+
+  useEffect(() => {
+    return activeProjectStore.subscribe(() => {
+      const nextComp = activeProjectStore.getCompanyId();
+      const nextProj = activeProjectStore.getProjectId();
+      setCompanyFilter(nextComp);
+      setProjectFilter(nextProj);
+      loadInvoices(q, statusFilter, nextComp, nextProj);
+    });
+  }, [q, statusFilter]);
 
   const handleExportCsv = () => {
     const year = new Date().getFullYear();
@@ -94,6 +114,7 @@ export const InvoicesPage: React.FC = () => {
           <thead>
             <tr>
               <th>Tax Invoice No.</th>
+              <th>Our Company</th>
               <th>Type</th>
               <th>Reference (Project / Claim / Report)</th>
               <th>Client</th>
@@ -109,6 +130,16 @@ export const InvoicesPage: React.FC = () => {
               <tr key={inv.id}>
                 <td>
                   <Link to={`/invoices/${inv.id}`}>{inv.number || 'DRAFT'}</Link>
+                </td>
+                <td>
+                  {inv.company ? (
+                    <span className="pill">
+                      {inv.company.code ? `[${inv.company.code}] ` : ''}
+                      {inv.company.name}
+                    </span>
+                  ) : (
+                    <span className="small muted">-</span>
+                  )}
                 </td>
                 <td>
                   {inv.type === 'PROGRESS_CLAIM'

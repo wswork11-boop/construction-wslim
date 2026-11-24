@@ -3,7 +3,7 @@
     {
       "id": "01a20c95-5eb5-7278-878c-80ab0b8cac51",
       "email": "owner@example.com",
-      "passwordHash": "$argon2id$v=19$m=19456,t=2,p=1$fCO4gKs0/iOkj4Q+vmOBZA$ZdyrGHrBJAEMlFg1lYgavaDHl4oD+4SAgtC1klw/XwQ",
+      "passwordHash": "$argon2id$v=19$m=19456,t=2,p=1$I4puHcSwL3Z8Y4dbA24fyA$C7ia/YCmfFcHcW8D1K73Z8FSb/Vj7Mew36HCXmuTZvw",
       "name": "Owner",
       "phone": null,
       "role": "OWNER",
@@ -11,7 +11,7 @@
       "companyName": null,
       "isActive": true,
       "createdAt": "2026-11-24T08:04:05.429Z",
-      "updatedAt": "2026-11-24T09:24:15.272Z"
+      "updatedAt": "2026-11-24T15:55:42.173Z"
     },
     {
       "id": "01a20c96-3edb-710c-a3ce-cbd160dfef5d",
@@ -64,7 +64,7 @@
       "isDefault": false,
       "isActive": true,
       "createdAt": "2026-11-24T08:04:05.431Z",
-      "updatedAt": "2026-11-24T09:24:15.274Z"
+      "updatedAt": "2026-11-24T15:55:42.176Z"
     },
     {
       "id": "01a20c96-3eb0-701b-b1bb-f9436934183b",
@@ -109,6 +109,28 @@
       "isActive": true,
       "createdAt": "2026-11-24T08:05:02.776Z",
       "updatedAt": "2026-11-24T08:05:02.776Z"
+    },
+    {
+      "id": "01a20e45-24f5-7416-89ac-6265507690b3",
+      "singleton": null,
+      "code": "CME-1795535742196",
+      "name": "Sister Co B",
+      "registrationNo": null,
+      "tin": null,
+      "sstNo": null,
+      "msicCode": null,
+      "address": null,
+      "phone": null,
+      "email": null,
+      "logoFileId": null,
+      "bankDetails": null,
+      "defaultPaymentTermDays": 30,
+      "defaultRetentionPercent": "10",
+      "defaultRetentionCapPercent": "5",
+      "isDefault": false,
+      "isActive": true,
+      "createdAt": "2026-11-24T15:55:42.197Z",
+      "updatedAt": "2026-11-24T15:55:42.197Z"
     }
   ],
   "taxRate": [
@@ -119,7 +141,7 @@
       "isDefault": true,
       "isActive": true,
       "createdAt": "2026-11-24T08:04:05.436Z",
-      "updatedAt": "2026-11-24T09:24:15.281Z"
+      "updatedAt": "2026-11-24T15:55:42.182Z"
     },
     {
       "id": "01a20c95-5ec2-77d9-8110-65089375736a",
@@ -128,11 +150,49 @@
       "isDefault": false,
       "isActive": true,
       "createdAt": "2026-11-24T08:04:05.442Z",
-      "updatedAt": "2026-11-24T09:24:15.287Z"
+      "updatedAt": "2026-11-24T15:55:42.188Z"
     }
   ],
-  "documentSequence": [],
-  "client": [],
+  "documentSequence": [
+    {
+      "id": "01a20e45-250b-74c9-92ae-3067e5d7a5ec",
+      "docType": "QT",
+      "year": 2026,
+      "lastNumber": 2,
+      "updatedAt": "2026-11-24T15:55:42.247Z"
+    },
+    {
+      "id": "01a20e45-2555-76c9-b4f0-e43f5a8ac663",
+      "docType": "INV",
+      "year": 2026,
+      "lastNumber": 1,
+      "updatedAt": "2026-11-24T15:55:42.293Z"
+    },
+    {
+      "id": "01a20e45-2573-775c-a5cb-fbf70d4e9ad3",
+      "docType": "EXP",
+      "year": 2026,
+      "lastNumber": 1,
+      "updatedAt": "2026-11-24T15:55:42.323Z"
+    }
+  ],
+  "client": [
+    {
+      "id": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+      "code": "C1",
+      "name": "Client 1795535742206",
+      "registrationNo": null,
+      "tin": null,
+      "sstNo": null,
+      "address": null,
+      "contactName": null,
+      "phone": null,
+      "email": null,
+      "isActive": true,
+      "createdAt": "2026-11-24T15:55:42.206Z",
+      "updatedAt": "2026-11-24T15:55:42.206Z"
+    }
+  ],
   "project": [],
   "projectMember": [],
   "file": [
@@ -147,6 +207,18 @@
       "uploadedById": "00000000-0000-7000-8000-000000000001",
       "createdAt": "2026-11-24T09:24:15.295Z",
       "updatedAt": "2026-11-24T09:24:15.295Z"
+    },
+    {
+      "id": "01a20e45-2561-72f5-854a-e9807a0eb7d4",
+      "bucketKey": "document_pdf/01a20e45-2561-72f5-854a-e9807a0eb7d4/INV-26-0001.pdf",
+      "fileName": "INV-26-0001.pdf",
+      "mimeType": "application/pdf",
+      "size": 3012,
+      "purpose": "DOCUMENT_PDF",
+      "status": "READY",
+      "uploadedById": "00000000-0000-7000-8000-000000000001",
+      "createdAt": "2026-11-24T15:55:42.305Z",
+      "updatedAt": "2026-11-24T15:55:42.305Z"
     }
   ],
   "auditLog": [
@@ -248,16 +320,580 @@
         "updatedAt": "2026-11-24T08:05:02.811Z"
       },
       "at": "2026-11-24T08:05:02.819Z"
+    },
+    {
+      "id": "01a20e45-24f8-70c9-955b-15d16176eba0",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Company",
+      "entityId": "01a20e45-24f5-7416-89ac-6265507690b3",
+      "action": "CREATE",
+      "before": null,
+      "after": {
+        "id": "01a20e45-24f5-7416-89ac-6265507690b3",
+        "code": "CME-1795535742196",
+        "name": "Sister Co B",
+        "registrationNo": null,
+        "tin": null,
+        "sstNo": null,
+        "msicCode": null,
+        "address": null,
+        "phone": null,
+        "email": null,
+        "logoFileId": null,
+        "bankDetails": null,
+        "defaultPaymentTermDays": 30,
+        "defaultRetentionPercent": "10.00",
+        "defaultRetentionCapPercent": "5.00",
+        "isDefault": false,
+        "isActive": true,
+        "createdAt": "2026-11-24T15:55:42.197Z",
+        "updatedAt": "2026-11-24T15:55:42.197Z"
+      },
+      "at": "2026-11-24T15:55:42.200Z"
+    },
+    {
+      "id": "01a20e45-2504-718a-b7ef-816c27427c00",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Client",
+      "entityId": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+      "action": "CREATE",
+      "before": null,
+      "after": {
+        "id": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+        "code": "C1",
+        "name": "Client 1795535742206",
+        "registrationNo": null,
+        "tin": null,
+        "sstNo": null,
+        "address": null,
+        "contactName": null,
+        "phone": null,
+        "email": null,
+        "isActive": true,
+        "createdAt": "2026-11-24T15:55:42.206Z",
+        "updatedAt": "2026-11-24T15:55:42.206Z"
+      },
+      "at": "2026-11-24T15:55:42.212Z"
+    },
+    {
+      "id": "01a20e45-2521-74bc-b73e-c8b4ae74d192",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Quotation",
+      "entityId": "01a20e45-250b-74c9-92ae-2f1487622721",
+      "action": "CREATE",
+      "before": null,
+      "after": {
+        "id": "01a20e45-250b-74c9-92ae-2f1487622721",
+        "number": "QT-26-001-C1",
+        "displayNumber": "QT-26-001-C1-R0",
+        "rootId": "01a20e45-250b-74c9-92ae-2f1487622721",
+        "revisionNo": 0,
+        "clientId": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+        "companyId": "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+        "company": {
+          "id": "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+          "code": null,
+          "name": "Contoh Bina Sdn Bhd"
+        },
+        "client": {
+          "id": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+          "code": "C1",
+          "name": "Client 1795535742206"
+        },
+        "projectId": null,
+        "title": "Quote for Comp A",
+        "status": "DRAFT",
+        "issueDate": "2026-11-24",
+        "validUntil": null,
+        "subtotal": "1000.00",
+        "discountAmount": "0.00",
+        "taxAmount": "0.00",
+        "total": "1000.00",
+        "createdById": "00000000-0000-7000-8000-000000000001",
+        "createdAt": "2026-11-24T15:55:42.223Z",
+        "updatedAt": "2026-11-24T15:55:42.223Z",
+        "terms": null,
+        "notes": null,
+        "pdfFileId": null,
+        "rejectionReason": null,
+        "sections": [
+          {
+            "id": "01a20e45-2515-7317-b02e-edeb6abd377b",
+            "quotationId": "01a20e45-250b-74c9-92ae-2f1487622721",
+            "sortOrder": 0,
+            "title": "Sec 1",
+            "subtotal": "1000.00",
+            "items": [
+              {
+                "id": "01a20e45-251b-732c-aeff-ccc7e52431dc",
+                "quotationId": "01a20e45-250b-74c9-92ae-2f1487622721",
+                "sectionId": "01a20e45-2515-7317-b02e-edeb6abd377b",
+                "sortOrder": 0,
+                "description": "Item",
+                "unit": null,
+                "quantity": "1.000",
+                "rate": "1000.00",
+                "amount": "1000.00",
+                "taxRateId": null,
+                "taxPercent": "0.00"
+              }
+            ]
+          }
+        ]
+      },
+      "at": "2026-11-24T15:55:42.241Z"
+    },
+    {
+      "id": "01a20e45-253d-71d1-aadf-46651fd4bc3f",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Quotation",
+      "entityId": "01a20e45-2526-74fb-a178-a20f42030ae3",
+      "action": "CREATE",
+      "before": null,
+      "after": {
+        "id": "01a20e45-2526-74fb-a178-a20f42030ae3",
+        "number": "QT-26-002-C1",
+        "displayNumber": "QT-26-002-C1-R0",
+        "rootId": "01a20e45-2526-74fb-a178-a20f42030ae3",
+        "revisionNo": 0,
+        "clientId": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+        "companyId": "01a20e45-24f5-7416-89ac-6265507690b3",
+        "company": {
+          "id": "01a20e45-24f5-7416-89ac-6265507690b3",
+          "code": "CME-1795535742196",
+          "name": "Sister Co B"
+        },
+        "client": {
+          "id": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+          "code": "C1",
+          "name": "Client 1795535742206"
+        },
+        "projectId": null,
+        "title": "Quote for Comp B",
+        "status": "DRAFT",
+        "issueDate": "2026-11-24",
+        "validUntil": null,
+        "subtotal": "2000.00",
+        "discountAmount": "0.00",
+        "taxAmount": "0.00",
+        "total": "2000.00",
+        "createdById": "00000000-0000-7000-8000-000000000001",
+        "createdAt": "2026-11-24T15:55:42.252Z",
+        "updatedAt": "2026-11-24T15:55:42.252Z",
+        "terms": null,
+        "notes": null,
+        "pdfFileId": null,
+        "rejectionReason": null,
+        "sections": [
+          {
+            "id": "01a20e45-2531-72ed-867a-71c608627b4f",
+            "quotationId": "01a20e45-2526-74fb-a178-a20f42030ae3",
+            "sortOrder": 0,
+            "title": "Sec 1",
+            "subtotal": "2000.00",
+            "items": [
+              {
+                "id": "01a20e45-2537-771c-9179-105275eb710e",
+                "quotationId": "01a20e45-2526-74fb-a178-a20f42030ae3",
+                "sectionId": "01a20e45-2531-72ed-867a-71c608627b4f",
+                "sortOrder": 0,
+                "description": "Item",
+                "unit": null,
+                "quantity": "1.000",
+                "rate": "2000.00",
+                "amount": "2000.00",
+                "taxRateId": null,
+                "taxPercent": "0.00"
+              }
+            ]
+          }
+        ]
+      },
+      "at": "2026-11-24T15:55:42.269Z"
+    },
+    {
+      "id": "01a20e45-254f-77d9-b208-447f40b20da0",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Invoice",
+      "entityId": "01a20e45-2543-729c-bb28-7354fcdbd645",
+      "action": "CREATE_SIMPLE",
+      "before": null,
+      "after": {
+        "id": "01a20e45-2543-729c-bb28-7354fcdbd645",
+        "number": null,
+        "type": "SIMPLE",
+        "companyId": "01a20e45-24f5-7416-89ac-6265507690b3",
+        "company": {
+          "id": "01a20e45-24f5-7416-89ac-6265507690b3",
+          "code": "CME-1795535742196",
+          "name": "Sister Co B"
+        },
+        "projectId": null,
+        "project": null,
+        "clientId": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+        "client": {
+          "id": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+          "code": "C1",
+          "name": "Client 1795535742206"
+        },
+        "status": "DRAFT",
+        "issueDate": null,
+        "dueDate": null,
+        "claimNo": null,
+        "progressReportId": null,
+        "projectCodeRef": null,
+        "quotePoRef": null,
+        "claimReportRef": null,
+        "referenceSummary": null,
+        "periodFrom": null,
+        "periodTo": null,
+        "grossToDate": null,
+        "retentionToDate": null,
+        "previousNetCertified": null,
+        "taxPercent": null,
+        "subtotal": "5000.00",
+        "taxAmount": "0.00",
+        "total": "5000.00",
+        "amountPaid": "0.00",
+        "eInvoiceStatus": "NOT_REQUIRED",
+        "createdById": "00000000-0000-7000-8000-000000000001",
+        "createdAt": "2026-11-24T15:55:42.275Z",
+        "updatedAt": "2026-11-24T15:55:42.275Z",
+        "notes": null,
+        "pdfFileId": null,
+        "voidReason": null,
+        "voidedAt": null,
+        "buyer": null,
+        "supplier": null,
+        "eInvoiceUuid": null,
+        "eInvoiceLongId": null,
+        "eInvoiceValidatedAt": null,
+        "lines": [
+          {
+            "id": "01a20e45-2543-729c-bb28-6fa39c561a6f",
+            "invoiceId": "01a20e45-2543-729c-bb28-7354fcdbd645",
+            "sortOrder": 0,
+            "description": "Work B",
+            "unit": null,
+            "quantity": "1.000",
+            "rate": "5000.00",
+            "amount": "5000.00",
+            "taxPercent": "0.00",
+            "taxAmount": "0.00",
+            "classificationCode": "022"
+          }
+        ],
+        "claimLines": [],
+        "creditNotes": []
+      },
+      "at": "2026-11-24T15:55:42.287Z"
+    },
+    {
+      "id": "01a20e45-256c-75fd-9fc1-0f334bff6654",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Invoice",
+      "entityId": "01a20e45-2543-729c-bb28-7354fcdbd645",
+      "action": "ISSUE",
+      "before": null,
+      "after": {
+        "id": "01a20e45-2543-729c-bb28-7354fcdbd645",
+        "number": "INV-26-0001",
+        "type": "SIMPLE",
+        "companyId": "01a20e45-24f5-7416-89ac-6265507690b3",
+        "company": {
+          "id": "01a20e45-24f5-7416-89ac-6265507690b3",
+          "code": "CME-1795535742196",
+          "name": "Sister Co B"
+        },
+        "projectId": null,
+        "project": null,
+        "clientId": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+        "client": {
+          "id": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+          "code": "C1",
+          "name": "Client 1795535742206"
+        },
+        "status": "ISSUED",
+        "issueDate": "2026-11-24",
+        "dueDate": "2026-12-24",
+        "claimNo": null,
+        "progressReportId": null,
+        "projectCodeRef": null,
+        "quotePoRef": null,
+        "claimReportRef": null,
+        "referenceSummary": null,
+        "periodFrom": null,
+        "periodTo": null,
+        "grossToDate": null,
+        "retentionToDate": null,
+        "previousNetCertified": null,
+        "taxPercent": null,
+        "subtotal": "5000.00",
+        "taxAmount": "0.00",
+        "total": "5000.00",
+        "amountPaid": "0.00",
+        "eInvoiceStatus": "NOT_REQUIRED",
+        "createdById": "00000000-0000-7000-8000-000000000001",
+        "createdAt": "2026-11-24T15:55:42.275Z",
+        "updatedAt": "2026-11-24T15:55:42.310Z",
+        "notes": null,
+        "pdfFileId": "01a20e45-2561-72f5-854a-e9807a0eb7d4",
+        "voidReason": null,
+        "voidedAt": null,
+        "buyer": {
+          "name": "Client 1795535742206",
+          "registrationNo": null,
+          "tin": null,
+          "sstNo": null,
+          "address": null
+        },
+        "supplier": {
+          "name": "Sister Co B",
+          "registrationNo": null,
+          "tin": null,
+          "sstNo": null,
+          "msicCode": null,
+          "address": null
+        },
+        "eInvoiceUuid": null,
+        "eInvoiceLongId": null,
+        "eInvoiceValidatedAt": null,
+        "lines": [
+          {
+            "id": "01a20e45-2543-729c-bb28-6fa39c561a6f",
+            "invoiceId": "01a20e45-2543-729c-bb28-7354fcdbd645",
+            "sortOrder": 0,
+            "description": "Work B",
+            "unit": null,
+            "quantity": "1.000",
+            "rate": "5000.00",
+            "amount": "5000.00",
+            "taxPercent": "0.00",
+            "taxAmount": "0.00",
+            "classificationCode": "022"
+          }
+        ],
+        "claimLines": [],
+        "creditNotes": []
+      },
+      "at": "2026-11-24T15:55:42.316Z"
+    },
+    {
+      "id": "01a20e45-257f-773b-8129-60d341d2e07a",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Expense",
+      "entityId": "01a20e45-2579-7618-b0fb-d65b6eb42109",
+      "action": "CREATE",
+      "before": null,
+      "after": {
+        "id": "01a20e45-2579-7618-b0fb-d65b6eb42109",
+        "number": "EXP-26-0001",
+        "companyId": "01a20e45-24f5-7416-89ac-6265507690b3",
+        "company": {
+          "id": "01a20e45-24f5-7416-89ac-6265507690b3",
+          "code": "CME-1795535742196",
+          "name": "Sister Co B"
+        },
+        "projectId": null,
+        "projectCodeRef": null,
+        "project": null,
+        "category": "MATERIALS",
+        "status": "PAID",
+        "expenseDate": "2026-11-24",
+        "vendorName": "Vendor B",
+        "billReference": null,
+        "description": "Materials for Comp B",
+        "subtotal": "800.00",
+        "taxRateId": null,
+        "taxPercent": "0.00",
+        "taxAmount": "0.00",
+        "total": "800.00",
+        "paidDate": "2026-11-24",
+        "paymentMethod": "BANK_TRANSFER",
+        "paymentReference": null,
+        "receiptFileId": null,
+        "receiptUrl": null,
+        "notes": null,
+        "voidedAt": null,
+        "voidReason": null,
+        "createdById": "00000000-0000-7000-8000-000000000001",
+        "createdAt": "2026-11-24T15:55:42.329Z",
+        "updatedAt": "2026-11-24T15:55:42.329Z"
+      },
+      "at": "2026-11-24T15:55:42.335Z"
     }
   ],
-  "quotation": [],
-  "quotationSection": [],
-  "quotationItem": [],
+  "quotation": [
+    {
+      "id": "01a20e45-250b-74c9-92ae-2f1487622721",
+      "number": "QT-26-001-C1",
+      "rootId": "01a20e45-250b-74c9-92ae-2f1487622721",
+      "revisionNo": 0,
+      "clientId": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+      "companyId": "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+      "projectId": null,
+      "title": "Quote for Comp A",
+      "status": "DRAFT",
+      "issueDate": "2026-11-24T00:00:00.000Z",
+      "validUntil": null,
+      "terms": null,
+      "notes": null,
+      "rejectionReason": null,
+      "subtotal": "1000",
+      "discountAmount": "0",
+      "taxAmount": "0",
+      "total": "1000",
+      "pdfFileId": null,
+      "createdById": "00000000-0000-7000-8000-000000000001",
+      "createdAt": "2026-11-24T15:55:42.223Z",
+      "updatedAt": "2026-11-24T15:55:42.223Z"
+    },
+    {
+      "id": "01a20e45-2526-74fb-a178-a20f42030ae3",
+      "number": "QT-26-002-C1",
+      "rootId": "01a20e45-2526-74fb-a178-a20f42030ae3",
+      "revisionNo": 0,
+      "clientId": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+      "companyId": "01a20e45-24f5-7416-89ac-6265507690b3",
+      "projectId": null,
+      "title": "Quote for Comp B",
+      "status": "DRAFT",
+      "issueDate": "2026-11-24T00:00:00.000Z",
+      "validUntil": null,
+      "terms": null,
+      "notes": null,
+      "rejectionReason": null,
+      "subtotal": "2000",
+      "discountAmount": "0",
+      "taxAmount": "0",
+      "total": "2000",
+      "pdfFileId": null,
+      "createdById": "00000000-0000-7000-8000-000000000001",
+      "createdAt": "2026-11-24T15:55:42.252Z",
+      "updatedAt": "2026-11-24T15:55:42.252Z"
+    }
+  ],
+  "quotationSection": [
+    {
+      "id": "01a20e45-2515-7317-b02e-edeb6abd377b",
+      "quotationId": "01a20e45-250b-74c9-92ae-2f1487622721",
+      "sortOrder": 0,
+      "title": "Sec 1",
+      "createdAt": "2026-11-24T15:55:42.229Z",
+      "updatedAt": "2026-11-24T15:55:42.229Z"
+    },
+    {
+      "id": "01a20e45-2531-72ed-867a-71c608627b4f",
+      "quotationId": "01a20e45-2526-74fb-a178-a20f42030ae3",
+      "sortOrder": 0,
+      "title": "Sec 1",
+      "createdAt": "2026-11-24T15:55:42.257Z",
+      "updatedAt": "2026-11-24T15:55:42.257Z"
+    }
+  ],
+  "quotationItem": [
+    {
+      "id": "01a20e45-251b-732c-aeff-ccc7e52431dc",
+      "quotationId": "01a20e45-250b-74c9-92ae-2f1487622721",
+      "sectionId": "01a20e45-2515-7317-b02e-edeb6abd377b",
+      "sortOrder": 0,
+      "description": "Item",
+      "unit": null,
+      "quantity": "1",
+      "rate": "1000",
+      "amount": "1000",
+      "taxRateId": null,
+      "taxPercent": "0",
+      "createdAt": "2026-11-24T15:55:42.235Z",
+      "updatedAt": "2026-11-24T15:55:42.235Z"
+    },
+    {
+      "id": "01a20e45-2537-771c-9179-105275eb710e",
+      "quotationId": "01a20e45-2526-74fb-a178-a20f42030ae3",
+      "sectionId": "01a20e45-2531-72ed-867a-71c608627b4f",
+      "sortOrder": 0,
+      "description": "Item",
+      "unit": null,
+      "quantity": "1",
+      "rate": "2000",
+      "amount": "2000",
+      "taxRateId": null,
+      "taxPercent": "0",
+      "createdAt": "2026-11-24T15:55:42.263Z",
+      "updatedAt": "2026-11-24T15:55:42.263Z"
+    }
+  ],
   "contractItem": [],
   "variationOrder": [],
   "variationOrderItem": [],
-  "invoice": [],
-  "invoiceLine": [],
+  "invoice": [
+    {
+      "id": "01a20e45-2543-729c-bb28-7354fcdbd645",
+      "number": "INV-26-0001",
+      "type": "SIMPLE",
+      "companyId": "01a20e45-24f5-7416-89ac-6265507690b3",
+      "projectId": null,
+      "clientId": "01a20e45-24fe-73ee-85b8-66277bb46bce",
+      "status": "ISSUED",
+      "issueDate": "2026-11-24T00:00:00.000Z",
+      "dueDate": "2026-12-24T00:00:00.000Z",
+      "claimNo": null,
+      "progressReportId": null,
+      "projectCodeRef": null,
+      "quotePoRef": null,
+      "claimReportRef": null,
+      "referenceSummary": null,
+      "periodFrom": null,
+      "periodTo": null,
+      "grossToDate": null,
+      "retentionToDate": null,
+      "previousNetCertified": null,
+      "taxPercent": null,
+      "subtotal": "5000",
+      "taxAmount": "0",
+      "total": "5000",
+      "amountPaid": "0",
+      "notes": null,
+      "pdfFileId": "01a20e45-2561-72f5-854a-e9807a0eb7d4",
+      "voidedAt": null,
+      "voidReason": null,
+      "buyerName": "Client 1795535742206",
+      "buyerRegistrationNo": null,
+      "buyerTin": null,
+      "buyerSstNo": null,
+      "buyerAddress": null,
+      "supplierName": "Sister Co B",
+      "supplierRegistrationNo": null,
+      "supplierTin": null,
+      "supplierSstNo": null,
+      "supplierMsicCode": null,
+      "supplierAddress": null,
+      "eInvoiceStatus": "NOT_REQUIRED",
+      "eInvoiceUuid": null,
+      "eInvoiceLongId": null,
+      "eInvoiceValidatedAt": null,
+      "createdById": "00000000-0000-7000-8000-000000000001",
+      "createdAt": "2026-11-24T15:55:42.275Z",
+      "updatedAt": "2026-11-24T15:55:42.310Z"
+    }
+  ],
+  "invoiceLine": [
+    {
+      "id": "01a20e45-2543-729c-bb28-6fa39c561a6f",
+      "invoiceId": "01a20e45-2543-729c-bb28-7354fcdbd645",
+      "sortOrder": 0,
+      "description": "Work B",
+      "unit": null,
+      "quantity": "1",
+      "rate": "5000",
+      "amount": "5000",
+      "taxPercent": "0",
+      "taxAmount": "0",
+      "classificationCode": "022",
+      "createdAt": "2026-11-24T15:55:42.280Z",
+      "updatedAt": "2026-11-24T15:55:42.280Z"
+    }
+  ],
   "claimLine": [],
   "creditNote": [],
   "payment": [],
@@ -269,5 +905,34 @@
   "progressReport": [],
   "progressReportLine": [],
   "inspectionReport": [],
-  "expense": []
+  "expense": [
+    {
+      "id": "01a20e45-2579-7618-b0fb-d65b6eb42109",
+      "number": "EXP-26-0001",
+      "companyId": "01a20e45-24f5-7416-89ac-6265507690b3",
+      "projectId": null,
+      "projectCodeRef": null,
+      "category": "MATERIALS",
+      "status": "PAID",
+      "expenseDate": "2026-11-24T00:00:00.000Z",
+      "vendorName": "Vendor B",
+      "billReference": null,
+      "description": "Materials for Comp B",
+      "subtotal": "800",
+      "taxRateId": null,
+      "taxPercent": "0",
+      "taxAmount": "0",
+      "total": "800",
+      "paidDate": "2026-11-24T00:00:00.000Z",
+      "paymentMethod": "BANK_TRANSFER",
+      "paymentReference": null,
+      "receiptFileId": null,
+      "notes": null,
+      "voidedAt": null,
+      "voidReason": null,
+      "createdById": "00000000-0000-7000-8000-000000000001",
+      "createdAt": "2026-11-24T15:55:42.329Z",
+      "updatedAt": "2026-11-24T15:55:42.329Z"
+    }
+  ]
 }
