@@ -28,8 +28,8 @@ export class CompanyController {
   constructor(private readonly companyService: CompanyService) {}
 
   @Get('company')
-  async getCompany() {
-    return this.companyService.getCompany();
+  async getCompany(@CurrentUser() user: AuthUser) {
+    return this.companyService.getCompany(user);
   }
 
   @Patch('company')
@@ -40,8 +40,8 @@ export class CompanyController {
   }
 
   @Get('companies')
-  async listCompanies() {
-    return this.companyService.listCompanies();
+  async listCompanies(@CurrentUser() user: AuthUser) {
+    return this.companyService.listCompanies(user);
   }
 
   @Post('companies')

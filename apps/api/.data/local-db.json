@@ -1,0 +1,260 @@
+{
+  "user": [
+    {
+      "id": "01a20c95-5eb5-7278-878c-80ab0b8cac51",
+      "email": "owner@example.com",
+      "passwordHash": "$argon2id$v=19$m=19456,t=2,p=1$orLqifIZyfAOtBhuETwJBg$GEbb0G8i1DkophLvRJZTsN+jrrhbmbZghwWiS65o4GA",
+      "name": "Owner",
+      "phone": null,
+      "role": "OWNER",
+      "companyId": null,
+      "companyName": null,
+      "isActive": true,
+      "createdAt": "2026-11-24T08:04:05.429Z",
+      "updatedAt": "2026-11-24T08:05:02.754Z"
+    },
+    {
+      "id": "01a20c96-3edb-710c-a3ce-cbd160dfef5d",
+      "email": "razak-1795507502784@subcon.com.my",
+      "passwordHash": "$argon2id$v=19$m=19456,t=2,p=1$X79OHiBCE61FMZ8CTqmgFw$49O3jpPh+ejHVkawZ7Ea5R6nV8gcBabByvAGtMlwo9E",
+      "name": "Encik Razak",
+      "phone": null,
+      "role": "PROJECT_MANAGER",
+      "companyId": "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+      "companyName": null,
+      "isActive": true,
+      "createdAt": "2026-11-24T08:05:02.811Z",
+      "updatedAt": "2026-11-24T08:05:02.811Z"
+    }
+  ],
+  "userCompany": [
+    {
+      "id": "01a20c96-3edc-7254-a5f5-99adcb6a8d97",
+      "userId": "01a20c96-3edb-710c-a3ce-cbd160dfef5d",
+      "companyId": "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+      "createdAt": "2026-11-24T08:05:02.812Z"
+    },
+    {
+      "id": "01a20c96-3edd-7041-96be-52f3aca7e9b9",
+      "userId": "01a20c96-3edb-710c-a3ce-cbd160dfef5d",
+      "companyId": "01a20c96-3eb0-701b-b1bb-f9436934183b",
+      "createdAt": "2026-11-24T08:05:02.813Z"
+    }
+  ],
+  "refreshToken": [],
+  "loginAttempt": [],
+  "company": [
+    {
+      "id": "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+      "singleton": true,
+      "code": null,
+      "name": "Contoh Bina Sdn Bhd",
+      "registrationNo": "201901000001",
+      "tin": "C0000000001",
+      "sstNo": null,
+      "msicCode": null,
+      "address": "1 Jalan Contoh, 47000 Sungai Buloh, Selangor",
+      "phone": "03-0000 0000",
+      "email": "office@example.com",
+      "logoFileId": null,
+      "bankDetails": null,
+      "defaultPaymentTermDays": 30,
+      "defaultRetentionPercent": "10",
+      "defaultRetentionCapPercent": "5",
+      "isDefault": false,
+      "isActive": true,
+      "createdAt": "2026-11-24T08:04:05.431Z",
+      "updatedAt": "2026-11-24T08:05:02.756Z"
+    },
+    {
+      "id": "01a20c96-3eb0-701b-b1bb-f9436934183b",
+      "singleton": null,
+      "code": "CME",
+      "name": "Contoh Maju Engineering Sdn Bhd",
+      "registrationNo": null,
+      "tin": null,
+      "sstNo": null,
+      "msicCode": null,
+      "address": null,
+      "phone": null,
+      "email": null,
+      "logoFileId": null,
+      "bankDetails": null,
+      "defaultPaymentTermDays": 30,
+      "defaultRetentionPercent": "10",
+      "defaultRetentionCapPercent": "5",
+      "isDefault": false,
+      "isActive": true,
+      "createdAt": "2026-11-24T08:05:02.768Z",
+      "updatedAt": "2026-11-24T08:05:02.768Z"
+    },
+    {
+      "id": "01a20c96-3eb8-7558-a5ea-02102c04db45",
+      "singleton": null,
+      "code": "CCH",
+      "name": "Contoh Civil Holdings Sdn Bhd",
+      "registrationNo": null,
+      "tin": null,
+      "sstNo": null,
+      "msicCode": null,
+      "address": null,
+      "phone": null,
+      "email": null,
+      "logoFileId": null,
+      "bankDetails": null,
+      "defaultPaymentTermDays": 30,
+      "defaultRetentionPercent": "10",
+      "defaultRetentionCapPercent": "5",
+      "isDefault": false,
+      "isActive": true,
+      "createdAt": "2026-11-24T08:05:02.776Z",
+      "updatedAt": "2026-11-24T08:05:02.776Z"
+    }
+  ],
+  "taxRate": [
+    {
+      "id": "01a20c95-5ebc-747e-b74c-11223fb65e19",
+      "name": "SST 6%",
+      "percent": "6",
+      "isDefault": true,
+      "isActive": true,
+      "createdAt": "2026-11-24T08:04:05.436Z",
+      "updatedAt": "2026-11-24T08:05:02.756Z"
+    },
+    {
+      "id": "01a20c95-5ec2-77d9-8110-65089375736a",
+      "name": "No tax",
+      "percent": "0",
+      "isDefault": false,
+      "isActive": true,
+      "createdAt": "2026-11-24T08:04:05.442Z",
+      "updatedAt": "2026-11-24T08:05:02.761Z"
+    }
+  ],
+  "documentSequence": [],
+  "client": [],
+  "project": [],
+  "projectMember": [],
+  "file": [],
+  "auditLog": [
+    {
+      "id": "01a20c96-3eb3-77f9-bcf6-aa62d3e12a6b",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Company",
+      "entityId": "01a20c96-3eb0-701b-b1bb-f9436934183b",
+      "action": "CREATE",
+      "before": null,
+      "after": {
+        "id": "01a20c96-3eb0-701b-b1bb-f9436934183b",
+        "code": "CME",
+        "name": "Contoh Maju Engineering Sdn Bhd",
+        "registrationNo": null,
+        "tin": null,
+        "sstNo": null,
+        "msicCode": null,
+        "address": null,
+        "phone": null,
+        "email": null,
+        "logoFileId": null,
+        "bankDetails": null,
+        "defaultPaymentTermDays": 30,
+        "defaultRetentionPercent": "10.00",
+        "defaultRetentionCapPercent": "5.00",
+        "isDefault": false,
+        "isActive": true,
+        "createdAt": "2026-11-24T08:05:02.768Z",
+        "updatedAt": "2026-11-24T08:05:02.768Z"
+      },
+      "at": "2026-11-24T08:05:02.771Z"
+    },
+    {
+      "id": "01a20c96-3ebc-76e9-aea7-0bbcf4e207fe",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "Company",
+      "entityId": "01a20c96-3eb8-7558-a5ea-02102c04db45",
+      "action": "CREATE",
+      "before": null,
+      "after": {
+        "id": "01a20c96-3eb8-7558-a5ea-02102c04db45",
+        "code": "CCH",
+        "name": "Contoh Civil Holdings Sdn Bhd",
+        "registrationNo": null,
+        "tin": null,
+        "sstNo": null,
+        "msicCode": null,
+        "address": null,
+        "phone": null,
+        "email": null,
+        "logoFileId": null,
+        "bankDetails": null,
+        "defaultPaymentTermDays": 30,
+        "defaultRetentionPercent": "10.00",
+        "defaultRetentionCapPercent": "5.00",
+        "isDefault": false,
+        "isActive": true,
+        "createdAt": "2026-11-24T08:05:02.776Z",
+        "updatedAt": "2026-11-24T08:05:02.776Z"
+      },
+      "at": "2026-11-24T08:05:02.780Z"
+    },
+    {
+      "id": "01a20c96-3ee3-73de-9df0-683776fca44c",
+      "userId": "00000000-0000-7000-8000-000000000001",
+      "entity": "User",
+      "entityId": "01a20c96-3edb-710c-a3ce-cbd160dfef5d",
+      "action": "CREATE",
+      "before": null,
+      "after": {
+        "id": "01a20c96-3edb-710c-a3ce-cbd160dfef5d",
+        "email": "razak-1795507502784@subcon.com.my",
+        "name": "Encik Razak",
+        "phone": null,
+        "role": "PROJECT_MANAGER",
+        "companyId": "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+        "companyName": "Contoh Bina Sdn Bhd, Contoh Maju Engineering Sdn Bhd",
+        "companies": [
+          {
+            "id": "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+            "code": null,
+            "name": "Contoh Bina Sdn Bhd"
+          },
+          {
+            "id": "01a20c96-3eb0-701b-b1bb-f9436934183b",
+            "code": "CME",
+            "name": "Contoh Maju Engineering Sdn Bhd"
+          }
+        ],
+        "companyIds": [
+          "01a20c95-5eb7-71dd-91ba-c9754ff09eb7",
+          "01a20c96-3eb0-701b-b1bb-f9436934183b"
+        ],
+        "projects": [],
+        "projectIds": [],
+        "isActive": true,
+        "createdAt": "2026-11-24T08:05:02.811Z",
+        "updatedAt": "2026-11-24T08:05:02.811Z"
+      },
+      "at": "2026-11-24T08:05:02.819Z"
+    }
+  ],
+  "quotation": [],
+  "quotationSection": [],
+  "quotationItem": [],
+  "contractItem": [],
+  "variationOrder": [],
+  "variationOrderItem": [],
+  "invoice": [],
+  "invoiceLine": [],
+  "claimLine": [],
+  "creditNote": [],
+  "payment": [],
+  "paymentAllocation": [],
+  "dailyReport": [],
+  "dailyReportManpower": [],
+  "dailyReportPhoto": [],
+  "dailyReportProgress": [],
+  "progressReport": [],
+  "progressReportLine": [],
+  "inspectionReport": [],
+  "expense": []
+}

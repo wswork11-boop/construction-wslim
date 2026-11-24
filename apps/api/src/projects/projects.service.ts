@@ -122,11 +122,28 @@ export class ProjectsService {
       ];
     }
 
-    // AC4: SITE_STAFF and PROJECT_MANAGER only see projects they are a member of
+    // AC4 / Spec 08 AC5: SITE_STAFF and PROJECT_MANAGER only see projects they are a member of
     if (user.role === Role.SITE_STAFF || user.role === Role.PROJECT_MANAGER) {
       where.members = {
         some: { userId: user.id },
       };
+    } else if (user.role === Role.OFFICE) {
+      // If OFFICE user is explicitly assigned to specific companies, only show projects belonging to their assigned companies
+      const accessibleCompanyIds = await this.projectAccessService.getAccessibleCompanyIds(user);
+      if (accessibleCompanyIds !== null && accessibleCompanyIds.length > 0) {
+        if (query.companyId) {
+          if (!accessibleCompanyIds.includes(query.companyId)) {
+            return {
+              items: [],
+              total: 0,
+              page: query.page,
+              pageSize: query.pageSize,
+            };
+          }
+        } else {
+          where.companyId = { in: accessibleCompanyIds };
+        }
+      }
     }
 
     const orderBy = parseSort(query.sort, ['createdAt', 'code', 'name', 'status']);

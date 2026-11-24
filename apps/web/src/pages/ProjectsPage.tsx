@@ -17,7 +17,7 @@ export const ProjectsPage: React.FC = () => {
 
   const [q, setQ] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('');
+  const [companyFilter, setCompanyFilter] = useState(activeProjectStore.getCompanyId());
 
   const [showForm, setShowForm] = useState(false);
   const [code, setCode] = useState('');
@@ -31,8 +31,11 @@ export const ProjectsPage: React.FC = () => {
   useEffect(() => {
     return activeProjectStore.subscribe(() => {
       setActiveProjectId(activeProjectStore.getProjectId());
+      const nextComp = activeProjectStore.getCompanyId();
+      setCompanyFilter(nextComp);
+      loadData(q, statusFilter, nextComp);
     });
-  }, []);
+  }, [q, statusFilter]);
 
   const loadData = async (search = q, st = statusFilter, comp = companyFilter) => {
     try {

@@ -116,6 +116,7 @@ export class InMemoryDatabase {
   clients: any[] = [];
   projects: any[] = [];
   projectMembers: any[] = [];
+  userCompanies: any[] = [];
   files: any[] = [];
   auditLogs: any[] = [];
   quotations: any[] = [];
@@ -196,6 +197,7 @@ export class InMemoryDatabase {
     this.clients = [];
     this.projects = [];
     this.projectMembers = [];
+    this.userCompanies = [];
     this.files = [];
     this.auditLogs = [];
     this.quotations = [];
@@ -261,12 +263,26 @@ export class InMemoryDatabase {
           ? this.companies.find((c) => c.id === row.companyId) || null
           : null;
       }
+      if (include.companies) {
+        const ucs = this.userCompanies.filter((uc) => uc.userId === row.id);
+        copy.companies = ucs.map((uc) => ({
+          ...uc,
+          company: this.companies.find((c) => c.id === uc.companyId) || null,
+        }));
+      }
       if (include.memberships) {
         const mems = this.projectMembers.filter((m) => m.userId === row.id);
         copy.memberships = mems.map((m) => ({
           ...m,
           project: this.projects.find((p) => p.id === m.projectId) || null,
         }));
+      }
+    } else if (tableName === 'userCompany') {
+      if (include.user) {
+        copy.user = this.users.find((u) => u.id === row.userId) || null;
+      }
+      if (include.company) {
+        copy.company = this.companies.find((c) => c.id === row.companyId) || null;
       }
     } else if (tableName === 'projectMember') {
       if (include.user) {
@@ -604,7 +620,19 @@ export class InMemoryDatabase {
         (u) => {
           db.refreshTokens = db.refreshTokens.filter((t) => t.userId !== u.id);
           db.projectMembers = db.projectMembers.filter((m) => m.userId !== u.id);
+          db.userCompanies = db.userCompanies.filter((uc) => uc.userId !== u.id);
         },
+      ),
+      userCompany: this.createModelDelegate(
+        'userCompany',
+        () => db.userCompanies,
+        (r) => (db.userCompanies = r),
+        (d) => ({
+          id: d.id ?? uuidv7(),
+          userId: d.userId,
+          companyId: d.companyId,
+          createdAt: d.createdAt ?? now(),
+        }),
       ),
       refreshToken: this.createModelDelegate(
         'refreshToken',

@@ -63,6 +63,18 @@ describe('Spec 08 - Multi-Company Profiles & Direct User-to-Project Assignment E
       .set('Authorization', `Bearer ${ownerToken}`);
     expect(listCompRes.status).toBe(200);
     expect(listCompRes.body.items.length).toBeGreaterThanOrEqual(2);
+    const companyAId = listCompRes.body.items.find((c: any) => c.id !== companyBId).id;
+
+    // Create a third company (Company C) that will NOT be assigned to our multi-company user
+    const compCRes = await api
+      .post('/api/v1/companies')
+      .set('Authorization', `Bearer ${ownerToken}`)
+      .send({
+        code: 'CCH',
+        name: 'Contoh Civil Holdings Sdn Bhd',
+      });
+    expect(compCRes.status).toBe(201);
+    const companyCId = compCRes.body.id;
 
     // 2. Create Client + 2 Projects (Project 1 under Company B, Project 2 under primary company)
     const clientRes = await api
@@ -119,7 +131,7 @@ describe('Spec 08 - Multi-Company Profiles & Direct User-to-Project Assignment E
     expect(issueRes.body.supplierRegistrationNo).toBe('202401099887');
     expect(issueRes.body.supplierTin).toBe('C9988776655');
 
-    // 4. AC3 & AC4: Create a user from an external company and assign them directly to Project 1
+    // 4. AC3 & AC4: Create a user assigned to multiple companies (Company A & Company B, but NOT Company C) and Project 1
     const subconUserRes = await api
       .post('/api/v1/users')
       .set('Authorization', `Bearer ${ownerToken}`)
@@ -128,25 +140,38 @@ describe('Spec 08 - Multi-Company Profiles & Direct User-to-Project Assignment E
         email: 'razak@subcon.com.my',
         password: 'Password123!',
         role: 'PROJECT_MANAGER',
-        companyName: 'Razak M&E Subcontractor Sdn Bhd',
+        companyIds: [companyAId, companyBId],
         projectIds: [project1Id],
       });
     expect(subconUserRes.status).toBe(201);
-    expect(subconUserRes.body.companyName).toBe('Razak M&E Subcontractor Sdn Bhd');
+    expect(subconUserRes.body.companyIds).toEqual(expect.arrayContaining([companyAId, companyBId]));
+    expect(subconUserRes.body.companies).toHaveLength(2);
     expect(subconUserRes.body.projects).toEqual([
       {
         id: project1Id,
         code: 'P26-101',
         name: 'Shah Alam Factory Fit-Out',
+        companyId: companyBId,
       },
     ]);
 
-    // 5. AC5: Log in as Encik Razak and verify he only sees his assigned project (P26-101)
+    // 5. AC5: Log in as Encik Razak and verify:
+    // - He only sees his 2 assigned companies (Company A & Company B) and Company C is hidden!
+    // - He only sees his assigned project (P26-101)
     const loginRazak = await api
       .post('/api/v1/auth/login')
       .send({ email: 'razak@subcon.com.my', password: 'Password123!' });
     expect(loginRazak.status).toBe(200);
     const razakToken = loginRazak.body.accessToken;
+
+    const razakCompaniesRes = await api
+      .get('/api/v1/companies')
+      .set('Authorization', `Bearer ${razakToken}`);
+    expect(razakCompaniesRes.status).toBe(200);
+    const visibleCompIds = razakCompaniesRes.body.items.map((c: any) => c.id);
+    expect(visibleCompIds).toContain(companyAId);
+    expect(visibleCompIds).toContain(companyBId);
+    expect(visibleCompIds).not.toContain(companyCId);
 
     const razakProjectsRes = await api
       .get('/api/v1/projects')

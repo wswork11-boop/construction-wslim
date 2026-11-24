@@ -1043,4 +1043,21 @@ ALTER TABLE "User" ADD CONSTRAINT "User_companyId_fkey" FOREIGN KEY ("companyId"
 ALTER TABLE "Project" ADD COLUMN IF NOT EXISTS "companyId" UUID;
 ALTER TABLE "Project" ADD CONSTRAINT "Project_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
+CREATE TABLE IF NOT EXISTS "UserCompany" (
+    "id" UUID NOT NULL,
+    "userId" UUID NOT NULL,
+    "companyId" UUID NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "UserCompany_pkey" PRIMARY KEY ("id")
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "UserCompany_userId_companyId_key" ON "UserCompany"("userId", "companyId");
+CREATE INDEX IF NOT EXISTS "UserCompany_userId_idx" ON "UserCompany"("userId");
+CREATE INDEX IF NOT EXISTS "UserCompany_companyId_idx" ON "UserCompany"("companyId");
+
+ALTER TABLE "UserCompany" ADD CONSTRAINT "UserCompany_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "UserCompany" ADD CONSTRAINT "UserCompany_companyId_fkey" FOREIGN KEY ("companyId") REFERENCES "Company"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+
 

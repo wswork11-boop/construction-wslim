@@ -67,6 +67,7 @@ export const UserCreateSchema = z.object({
   role: RoleSchema,
   password: z.string().min(8),
   companyId: z.string().uuid().nullable().optional(),
+  companyIds: z.array(z.string().uuid()).optional(),
   companyName: z.string().max(200).nullable().optional(),
   projectIds: z.array(z.string().uuid()).optional(),
 });
@@ -81,6 +82,7 @@ export const UserUpdateSchema = z
     isActive: z.boolean().optional(),
     password: z.string().min(8).optional(),
     companyId: z.string().uuid().nullable().optional(),
+    companyIds: z.array(z.string().uuid()).optional(),
     companyName: z.string().max(200).nullable().optional(),
     projectIds: z.array(z.string().uuid()).optional(),
   })

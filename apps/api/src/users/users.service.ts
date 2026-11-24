@@ -23,8 +23,33 @@ export class UsersService {
             id: m.project.id,
             code: m.project.code,
             name: m.project.name,
+            companyId: m.project.companyId ?? null,
           }))
       : [];
+
+    const companyMap = new Map<string, { id: string; code: string | null; name: string }>();
+    if (Array.isArray(user.companies)) {
+      for (const uc of user.companies) {
+        if (uc.company) {
+          companyMap.set(uc.company.id, {
+            id: uc.company.id,
+            code: uc.company.code ?? null,
+            name: uc.company.name,
+          });
+        }
+      }
+    }
+    if (user.company && !companyMap.has(user.company.id)) {
+      companyMap.set(user.company.id, {
+        id: user.company.id,
+        code: user.company.code ?? null,
+        name: user.company.name,
+      });
+    }
+    const companies = Array.from(companyMap.values());
+    const companyIds = companies.map((c) => c.id);
+    const derivedCompanyName =
+      user.companyName ?? (companies.length > 0 ? companies.map((c) => c.name).join(', ') : null);
 
     return {
       id: user.id,
@@ -32,14 +57,36 @@ export class UsersService {
       name: user.name,
       phone: user.phone ?? null,
       role: user.role,
-      companyId: user.companyId ?? null,
-      companyName: user.companyName ?? user.company?.name ?? null,
+      companyId: user.companyId ?? companies[0]?.id ?? null,
+      companyName: derivedCompanyName,
+      companies,
+      companyIds,
       projects,
       projectIds: projects.map((p: any) => p.id),
       isActive: user.isActive,
       createdAt: user.createdAt instanceof Date ? user.createdAt.toISOString() : user.createdAt,
       updatedAt: user.updatedAt instanceof Date ? user.updatedAt.toISOString() : user.updatedAt,
     };
+  }
+
+  private async syncUserCompanies(tx: any, userId: string, companyIds: string[]) {
+    const uniqueIds = Array.from(new Set(companyIds));
+    for (const cid of uniqueIds) {
+      const comp = await tx.company.findUnique({ where: { id: cid } });
+      if (!comp) {
+        throw AppException.unprocessable('COMPANY_NOT_FOUND', `Company ${cid} does not exist`);
+      }
+    }
+    await tx.userCompany.deleteMany({ where: { userId } });
+    for (const cid of uniqueIds) {
+      await tx.userCompany.create({
+        data: {
+          id: uuidv7(),
+          userId,
+          companyId: cid,
+        },
+      });
+    }
   }
 
   private async syncUserProjects(tx: any, userId: string, projectIds: string[]) {
@@ -83,7 +130,11 @@ export class UsersService {
         orderBy,
         skip,
         take: query.pageSize,
-        include: { company: true, memberships: { include: { project: true } } },
+        include: {
+          company: true,
+          companies: { include: { company: true } },
+          memberships: { include: { project: true } },
+        },
       }),
       this.prisma.user.count({ where }),
     ]);
@@ -99,7 +150,11 @@ export class UsersService {
   async getById(id: string, tx: any = this.prisma) {
     const user = await tx.user.findUnique({
       where: { id },
-      include: { company: true, memberships: { include: { project: true } } },
+      include: {
+        company: true,
+        companies: { include: { company: true } },
+        memberships: { include: { project: true } },
+      },
     });
     if (!user) {
       throw AppException.notFound('NOT_FOUND', 'User not found');
@@ -114,14 +169,19 @@ export class UsersService {
       throw AppException.conflict('USER_EMAIL_TAKEN', 'Another user already has this email');
     }
 
+    const companyIds = Array.from(
+      new Set([
+        ...(Array.isArray(dto.companyIds) ? dto.companyIds : []),
+        ...(dto.companyId ? [dto.companyId] : []),
+      ]),
+    );
+    const primaryCompanyId = dto.companyId ?? companyIds[0] ?? null;
+
     let resolvedCompanyName = dto.companyName?.trim() || null;
-    if (dto.companyId) {
-      const comp = await this.prisma.company.findUnique({ where: { id: dto.companyId } });
+    if (primaryCompanyId) {
+      const comp = await this.prisma.company.findUnique({ where: { id: primaryCompanyId } });
       if (!comp) {
         throw AppException.unprocessable('COMPANY_NOT_FOUND', 'companyId does not exist');
-      }
-      if (!resolvedCompanyName) {
-        resolvedCompanyName = comp.name;
       }
     }
 
@@ -133,12 +193,16 @@ export class UsersService {
           name: dto.name.trim(),
           phone: dto.phone ?? null,
           role: dto.role,
-          companyId: dto.companyId ?? null,
+          companyId: primaryCompanyId,
           companyName: resolvedCompanyName,
           passwordHash,
           isActive: true,
         },
       });
+
+      if (companyIds.length > 0) {
+        await this.syncUserCompanies(tx, created.id, companyIds);
+      }
 
       if (Array.isArray(dto.projectIds)) {
         await this.syncUserProjects(tx, created.id, dto.projectIds);
@@ -162,7 +226,11 @@ export class UsersService {
   async update(currentUser: AuthUser, id: string, dto: UserUpdate) {
     const existing = await this.prisma.user.findUnique({
       where: { id },
-      include: { company: true, memberships: { include: { project: true } } },
+      include: {
+        company: true,
+        companies: { include: { company: true } },
+        memberships: { include: { project: true } },
+      },
     });
     if (!existing) {
       throw AppException.notFound('NOT_FOUND', 'User not found');
@@ -195,14 +263,10 @@ export class UsersService {
     if (dto.phone !== undefined) updateData.phone = dto.phone;
     if (dto.role !== undefined) updateData.role = dto.role;
     if (dto.isActive !== undefined) updateData.isActive = dto.isActive;
-    if (dto.companyId !== undefined) {
+    if (Array.isArray(dto.companyIds)) {
+      updateData.companyId = dto.companyId !== undefined ? dto.companyId : (dto.companyIds[0] ?? null);
+    } else if (dto.companyId !== undefined) {
       updateData.companyId = dto.companyId;
-      if (dto.companyId && dto.companyName === undefined) {
-        const comp = await this.prisma.company.findUnique({ where: { id: dto.companyId } });
-        if (comp) {
-          updateData.companyName = comp.name;
-        }
-      }
     }
     if (dto.companyName !== undefined) {
       updateData.companyName = dto.companyName?.trim() || null;
@@ -217,6 +281,12 @@ export class UsersService {
           where: { id },
           data: updateData,
         });
+      }
+
+      if (Array.isArray(dto.companyIds)) {
+        await this.syncUserCompanies(tx, id, dto.companyIds);
+      } else if (dto.companyId !== undefined) {
+        await this.syncUserCompanies(tx, id, dto.companyId ? [dto.companyId] : []);
       }
 
       if (Array.isArray(dto.projectIds)) {

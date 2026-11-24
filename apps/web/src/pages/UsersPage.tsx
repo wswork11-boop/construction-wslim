@@ -14,7 +14,7 @@ export const UsersPage: React.FC = () => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [role, setRole] = useState<Role>(Role.PROJECT_MANAGER);
-  const [companyId, setCompanyId] = useState('');
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
   const [companyName, setCompanyName] = useState('');
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
   const [password, setPassword] = useState('');
@@ -45,7 +45,7 @@ export const UsersPage: React.FC = () => {
     setName('');
     setPhone('');
     setRole(Role.PROJECT_MANAGER);
-    setCompanyId('');
+    setSelectedCompanyIds([]);
     setCompanyName('');
     setSelectedProjectIds([]);
     setPassword('');
@@ -58,11 +58,25 @@ export const UsersPage: React.FC = () => {
     setName(u.name);
     setPhone(u.phone || '');
     setRole(u.role);
-    setCompanyId(u.companyId || '');
-    setCompanyName(u.companyName || '');
+    const cIds =
+      Array.isArray(u.companyIds) && u.companyIds.length > 0
+        ? u.companyIds
+        : u.companyId
+          ? [u.companyId]
+          : [];
+    setSelectedCompanyIds(cIds);
+    // Keep external companyName only if it differs from the auto-joined company names
+    const assignedNames = (u.companies || []).map((c: any) => c.name).join(', ');
+    setCompanyName(u.companyName && u.companyName !== assignedNames ? u.companyName : '');
     setSelectedProjectIds(u.projectIds || (u.projects || []).map((p: any) => p.id));
     setPassword('');
     setShowForm(true);
+  };
+
+  const toggleCompanySelection = (cid: string) => {
+    setSelectedCompanyIds((prev) =>
+      prev.includes(cid) ? prev.filter((id) => id !== cid) : [...prev, cid],
+    );
   };
 
   const toggleProjectSelection = (pid: string) => {
@@ -80,7 +94,8 @@ export const UsersPage: React.FC = () => {
         name,
         phone: phone || null,
         role,
-        companyId: companyId || null,
+        companyIds: selectedCompanyIds,
+        companyId: selectedCompanyIds[0] || null,
         companyName: companyName.trim() || null,
         projectIds: selectedProjectIds,
       };
@@ -151,34 +166,14 @@ export const UsersPage: React.FC = () => {
               <div>
                 <label>Role</label>
                 <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                  <option value={Role.OWNER}>OWNER (All access)</option>
-                  <option value={Role.OFFICE}>OFFICE (All projects)</option>
-                  <option value={Role.PROJECT_MANAGER}>PROJECT_MANAGER (Assigned projects)</option>
+                  <option value={Role.OWNER}>OWNER (All companies &amp; projects)</option>
+                  <option value={Role.OFFICE}>OFFICE (Assigned companies &amp; projects)</option>
+                  <option value={Role.PROJECT_MANAGER}>PROJECT_MANAGER (Assigned companies &amp; projects)</option>
                   <option value={Role.SITE_STAFF}>SITE_STAFF (Assigned projects, no prices)</option>
                 </select>
               </div>
               <div>
-                <label>Select from Your Companies (Optional)</label>
-                <select
-                  value={companyId}
-                  onChange={(e) => {
-                    const cid = e.target.value;
-                    setCompanyId(cid);
-                    const found = companies.find((c) => c.id === cid);
-                    if (found) setCompanyName(found.name);
-                  }}
-                >
-                  <option value="">-- External or custom company --</option>
-                  {companies.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.code ? `[${c.code}] ` : ''}
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label>Company Name (Own or External Subcon / Partner)</label>
+                <label>External / Subcon Company Name (Optional)</label>
                 <input
                   placeholder="e.g. Subcon Engineering Sdn Bhd"
                   value={companyName}
@@ -197,15 +192,13 @@ export const UsersPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Project Assignment Checkboxes */}
+            {/* Multi-Company Assignment Checkboxes */}
             <div style={{ marginTop: 14 }}>
               <label style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
-                Assign User to Projects ({selectedProjectIds.length} selected)
-                {(role === Role.OWNER || role === Role.OFFICE) && (
-                  <span className="small muted" style={{ fontWeight: 400, marginLeft: 8 }}>
-                    (OWNER and OFFICE automatically have access to all projects, or you can still tag their primary projects)
-                  </span>
-                )}
+                Assign User to Our Companies ({selectedCompanyIds.length} selected)
+                <span className="small muted" style={{ fontWeight: 400, marginLeft: 8 }}>
+                  (1 user can have multiple companies; unassigned companies are hidden from the user)
+                </span>
               </label>
               <div
                 style={{
@@ -216,15 +209,13 @@ export const UsersPage: React.FC = () => {
                   border: '1px solid var(--line)',
                   borderRadius: 6,
                   background: '#fafbfc',
-                  maxHeight: 200,
-                  overflowY: 'auto',
                 }}
               >
-                {projects.map((p) => {
-                  const checked = selectedProjectIds.includes(p.id);
+                {companies.map((c) => {
+                  const checked = selectedCompanyIds.includes(c.id);
                   return (
                     <label
-                      key={p.id}
+                      key={c.id}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -241,15 +232,86 @@ export const UsersPage: React.FC = () => {
                       <input
                         type="checkbox"
                         checked={checked}
-                        onChange={() => toggleProjectSelection(p.id)}
+                        onChange={() => toggleCompanySelection(c.id)}
                         style={{ width: 'auto', margin: 0 }}
                       />
                       <span>
-                        <b>{p.code}</b> &middot; {p.name}
+                        {c.code ? <b>[{c.code}] </b> : null}
+                        {c.name}
                       </span>
                     </label>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Project Assignment Checkboxes */}
+            <div style={{ marginTop: 14 }}>
+              <label style={{ fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>
+                Assign User to Projects ({selectedProjectIds.length} selected)
+                {selectedCompanyIds.length > 0 && (
+                  <span className="small muted" style={{ fontWeight: 400, marginLeft: 8 }}>
+                    (Showing projects for the selected companies)
+                  </span>
+                )}
+              </label>
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
+                  gap: 8,
+                  padding: 10,
+                  border: '1px solid var(--line)',
+                  borderRadius: 6,
+                  background: '#fafbfc',
+                  maxHeight: 200,
+                  overflowY: 'auto',
+                }}
+              >
+                {projects
+                  .filter(
+                    (p) =>
+                      selectedCompanyIds.length === 0 ||
+                      !p.companyId ||
+                      selectedCompanyIds.includes(p.companyId) ||
+                      selectedProjectIds.includes(p.id),
+                  )
+                  .map((p) => {
+                    const checked = selectedProjectIds.includes(p.id);
+                    const compBadge = p.company?.code || p.company?.name;
+                    return (
+                      <label
+                        key={p.id}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          padding: '6px 8px',
+                          borderRadius: 6,
+                          background: checked ? 'var(--brand-soft)' : '#fff',
+                          border: `1px solid ${checked ? 'var(--brand)' : 'var(--line)'}`,
+                          color: 'var(--text)',
+                          cursor: 'pointer',
+                          margin: 0,
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleProjectSelection(p.id)}
+                          style={{ width: 'auto', margin: 0 }}
+                        />
+                        <span>
+                          <b>{p.code}</b> &middot; {p.name}
+                          {compBadge && (
+                            <span className="small muted" style={{ marginLeft: 4 }}>
+                              ({compBadge})
+                            </span>
+                          )}
+                        </span>
+                      </label>
+                    );
+                  })}
                 {projects.length === 0 && (
                   <span className="small muted">No projects created yet.</span>
                 )}
@@ -285,8 +347,19 @@ export const UsersPage: React.FC = () => {
               <tr key={u.id}>
                 <td className="bold">{u.name}</td>
                 <td>
-                  {u.companyName ? (
+                  {(u.companies || []).length > 0 ? (
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                      {u.companies.map((c: any) => (
+                        <span key={c.id} className="pill">
+                          {c.code ? `[${c.code}] ` : ''}
+                          {c.name}
+                        </span>
+                      ))}
+                    </div>
+                  ) : u.companyName ? (
                     <span className="pill">{u.companyName}</span>
+                  ) : u.role === Role.OWNER ? (
+                    <span className="small muted">All companies</span>
                   ) : (
                     <span className="small muted">-</span>
                   )}

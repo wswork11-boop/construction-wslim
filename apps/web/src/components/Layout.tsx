@@ -10,7 +10,9 @@ export const Layout: React.FC = () => {
   const location = useLocation();
   const { user, refreshToken } = authStore.getState();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [companies, setCompanies] = useState<any[]>([]);
   const [projects, setProjects] = useState<any[]>([]);
+  const [activeCompanyId, setActiveCompanyId] = useState(activeProjectStore.getCompanyId());
   const [activeProjectId, setActiveProjectId] = useState(activeProjectStore.getProjectId());
 
   useEffect(() => {
@@ -19,28 +21,46 @@ export const Layout: React.FC = () => {
 
   useEffect(() => {
     return activeProjectStore.subscribe(() => {
+      setActiveCompanyId(activeProjectStore.getCompanyId());
       setActiveProjectId(activeProjectStore.getProjectId());
     });
   }, []);
 
   useEffect(() => {
-    apiFetch('/projects?pageSize=100')
-      .then((res) => {
-        const list = res.items || [];
-        setProjects(list);
-        const cur = activeProjectStore.getProjectId();
-        if (cur && !list.some((p: any) => p.id === cur)) {
-          activeProjectStore.setProjectId('');
-        } else if (
-          !cur &&
-          list.length === 1 &&
-          (user?.role === Role.PROJECT_MANAGER || user?.role === Role.SITE_STAFF)
-        ) {
-          // Auto-select if a PM or Site Staff is assigned to only 1 project
-          activeProjectStore.setProjectId(list[0].id);
-        }
-      })
-      .catch(() => {});
+    Promise.all([
+      apiFetch('/companies').catch(() => ({ items: [] })),
+      apiFetch('/projects?pageSize=100').catch(() => ({ items: [] })),
+    ]).then(([cRes, pRes]) => {
+      const compList = cRes.items || [];
+      const projList = pRes.items || [];
+      setCompanies(compList);
+      setProjects(projList);
+
+      let curCompanyId = activeProjectStore.getCompanyId();
+      if (curCompanyId && !compList.some((c: any) => c.id === curCompanyId)) {
+        curCompanyId = '';
+        activeProjectStore.setCompanyId('');
+      }
+      if (!curCompanyId && compList.length === 1 && user?.role !== Role.OWNER) {
+        curCompanyId = compList[0].id;
+        activeProjectStore.setCompanyId(curCompanyId);
+      }
+
+      const visibleProjects = curCompanyId
+        ? projList.filter((p: any) => p.companyId === curCompanyId)
+        : projList;
+
+      const curProjId = activeProjectStore.getProjectId();
+      if (curProjId && !visibleProjects.some((p: any) => p.id === curProjId)) {
+        activeProjectStore.setProjectId('');
+      } else if (
+        !curProjId &&
+        visibleProjects.length === 1 &&
+        (user?.role === Role.PROJECT_MANAGER || user?.role === Role.SITE_STAFF)
+      ) {
+        activeProjectStore.setProjectId(visibleProjects[0].id);
+      }
+    });
   }, [location.pathname]);
 
   const handleLogout = async () => {
@@ -59,7 +79,11 @@ export const Layout: React.FC = () => {
     }
   };
 
+  const filteredProjects = activeCompanyId
+    ? projects.filter((p) => p.companyId === activeCompanyId)
+    : projects;
   const activeProject = projects.find((p) => p.id === activeProjectId);
+  const activeCompany = companies.find((c) => c.id === activeCompanyId);
 
   return (
     <div className="app">
@@ -73,7 +97,11 @@ export const Layout: React.FC = () => {
           {menuOpen ? '\u2715' : '\u2630'}
         </button>
         <div className="mobile-logo">
-          {activeProject ? `${activeProject.code} · ${activeProject.name}` : 'Construction System'}
+          {activeProject
+            ? `${activeProject.code} · ${activeProject.name}`
+            : activeCompany
+              ? activeCompany.name
+              : 'Construction System'}
         </div>
         <div className="mobile-user small">{user?.name}</div>
       </header>
@@ -83,8 +111,59 @@ export const Layout: React.FC = () => {
       <nav className={`side ${menuOpen ? 'open' : ''}`}>
         <div className="logo">Construction System</div>
 
-        {/* Active Project Selector */}
+        {/* Active Company & Project Selector */}
         <div style={{ padding: '0 14px 10px' }}>
+          {companies.length > 0 && (
+            <div style={{ marginBottom: 8 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                  color: '#8e9ab5',
+                  marginBottom: 4,
+                }}
+              >
+                Active Company
+              </div>
+              <select
+                aria-label="Select active company"
+                value={activeCompanyId}
+                onChange={(e) => {
+                  const nextCompId = e.target.value;
+                  activeProjectStore.setCompanyId(nextCompId);
+                  if (
+                    nextCompId &&
+                    activeProject &&
+                    activeProject.companyId &&
+                    activeProject.companyId !== nextCompId
+                  ) {
+                    activeProjectStore.setProjectId('');
+                  }
+                }}
+                style={{
+                  background: '#222f49',
+                  color: '#fff',
+                  border: '1px solid #35466b',
+                  fontSize: 12,
+                  padding: '6px 8px',
+                }}
+              >
+                {(user?.role === Role.OWNER || companies.length > 1) && (
+                  <option value="">
+                    All Assigned Companies ({companies.length})
+                  </option>
+                )}
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code ? `[${c.code}] ` : ''}
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div
             style={{
               fontSize: 11,
@@ -114,8 +193,8 @@ export const Layout: React.FC = () => {
               padding: '6px 8px',
             }}
           >
-            <option value="">All Projects ({projects.length})</option>
-            {projects.map((p) => (
+            <option value="">All Projects ({filteredProjects.length})</option>
+            {filteredProjects.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.code} · {p.name}
               </option>

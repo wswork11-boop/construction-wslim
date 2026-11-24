@@ -12,12 +12,14 @@ import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/decorators';
 import { AppException } from '../common/errors';
 import { parseSort } from '../common/pagination';
+import { ProjectAccessService } from '../common/project-access.service';
 
 @Injectable()
 export class CompanyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    private readonly projectAccessService: ProjectAccessService,
   ) {}
 
   serializeCompany(company: any) {
@@ -58,7 +60,20 @@ export class CompanyService {
     };
   }
 
-  async getCompany() {
+  async getCompany(user?: AuthUser) {
+    if (user) {
+      const accessibleIds = await this.projectAccessService.getAccessibleCompanyIds(user);
+      if (accessibleIds !== null && accessibleIds.length > 0) {
+        const assignedComp = await this.prisma.company.findFirst({
+          where: { id: { in: accessibleIds } },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (assignedComp) {
+          return this.serializeCompany(assignedComp);
+        }
+      }
+    }
+
     let company = await this.prisma.company.findFirst({
       where: { isDefault: true },
     });
@@ -95,8 +110,26 @@ export class CompanyService {
     return this.serializeCompany(found);
   }
 
-  async listCompanies() {
+  async listCompanies(user?: AuthUser) {
     await this.getCompany();
+    const accessibleIds = user
+      ? await this.projectAccessService.getAccessibleCompanyIds(user)
+      : null;
+
+    if (accessibleIds !== null) {
+      if (accessibleIds.length === 0) {
+        return { items: [], total: 0 };
+      }
+      const items = await this.prisma.company.findMany({
+        where: { id: { in: accessibleIds } },
+        orderBy: { createdAt: 'asc' },
+      });
+      return {
+        items: items.map((c: any) => this.serializeCompany(c)),
+        total: items.length,
+      };
+    }
+
     const items = await this.prisma.company.findMany({
       orderBy: { createdAt: 'asc' },
     });

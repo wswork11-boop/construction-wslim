@@ -37,4 +37,43 @@ export class ProjectAccessService {
     });
     return memberships.map((m: any) => m.projectId);
   }
+
+  /**
+   * Returns the list of Company IDs assigned to a non-OWNER user,
+   * or `null` for OWNER (who can see all companies).
+   * Non-OWNER users only see companies they are explicitly assigned to via UserCompany,
+   * User.companyId, or via their assigned ProjectMembers.
+   */
+  async getAccessibleCompanyIds(user: AuthUser): Promise<string[] | null> {
+    if (user.role === Role.OWNER) {
+      return null;
+    }
+    const ids = new Set<string>();
+
+    const userRow = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      include: {
+        companies: true,
+        memberships: { include: { project: true } },
+      },
+    });
+
+    if (userRow?.companyId) {
+      ids.add(userRow.companyId);
+    }
+    if (Array.isArray(userRow?.companies)) {
+      for (const uc of userRow.companies) {
+        if (uc.companyId) ids.add(uc.companyId);
+      }
+    }
+    if (Array.isArray(userRow?.memberships)) {
+      for (const mem of userRow.memberships) {
+        if (mem.project?.companyId) {
+          ids.add(mem.project.companyId);
+        }
+      }
+    }
+
+    return Array.from(ids);
+  }
 }
