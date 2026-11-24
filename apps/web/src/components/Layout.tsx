@@ -15,6 +15,14 @@ export const Layout: React.FC = () => {
   const [activeCompanyId, setActiveCompanyId] = useState(activeProjectStore.getCompanyId());
   const [activeProjectId, setActiveProjectId] = useState(activeProjectStore.getProjectId());
 
+  // Change Password modal
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [pwMessage, setPwMessage] = useState<string | null>(null);
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSubmitting, setPwSubmitting] = useState(false);
+
   useEffect(() => {
     setMenuOpen(false);
   }, [location.pathname, location.search]);
@@ -76,6 +84,30 @@ export const Layout: React.FC = () => {
     } finally {
       authStore.clearSession();
       navigate('/login');
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError(null);
+    setPwMessage(null);
+    setPwSubmitting(true);
+    try {
+      await apiFetch('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      setPwMessage('Password changed! Please log in again with your new password.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setTimeout(() => {
+        authStore.clearSession();
+        navigate('/login');
+      }, 1500);
+    } catch (err: any) {
+      setPwError(err.message);
+    } finally {
+      setPwSubmitting(false);
     }
   };
 
@@ -279,12 +311,76 @@ export const Layout: React.FC = () => {
           <div className="small muted" style={{ marginBottom: 8 }}>
             {user?.role}
           </div>
+          <button
+            type="button"
+            className="btn sm"
+            onClick={() => {
+              setPwError(null);
+              setPwMessage(null);
+              setCurrentPassword('');
+              setNewPassword('');
+              setShowChangePassword(true);
+            }}
+            style={{
+              width: '100%',
+              marginBottom: 6,
+              background: '#222f49',
+              color: '#cfe0ff',
+              borderColor: '#35466b',
+            }}
+          >
+            Change password
+          </button>
           <button className="btn sm" onClick={handleLogout} style={{ width: '100%' }}>
             Log out
           </button>
         </div>
       </nav>
       <main className="main">
+        {showChangePassword && (
+          <div className="card" style={{ maxWidth: 440, marginBottom: 16 }}>
+            <h2>Change My Password</h2>
+            {pwError && <div className="error-banner">{pwError}</div>}
+            {pwMessage && (
+              <div className="card" style={{ background: 'var(--ok-soft)', color: 'var(--ok)' }}>
+                {pwMessage}
+              </div>
+            )}
+            <form onSubmit={handleChangePassword}>
+              <div className="field">
+                <label>Current password</label>
+                <input
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>New password (min 8 characters)</label>
+                <input
+                  type="password"
+                  minLength={8}
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                <button type="submit" className="btn pri" disabled={pwSubmitting}>
+                  {pwSubmitting ? 'Updating...' : 'Update password'}
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  onClick={() => setShowChangePassword(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
         <Outlet />
       </main>
     </div>

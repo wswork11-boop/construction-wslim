@@ -117,3 +117,29 @@ export async function apiDownload(path: string, fallbackFileName: string): Promi
   URL.revokeObjectURL(url);
 }
 
+export function getFileContentUrl(fileId: string): string {
+  return `${API_BASE}/files/${fileId}/content`;
+}
+
+export async function apiUploadFile(
+  file: File,
+  purpose: 'COMPANY_LOGO' | 'EXPENSE_RECEIPT' | 'DAILY_REPORT_PHOTO' | 'DOCUMENT_PDF',
+): Promise<{ fileId: string; fileName: string; mimeType: string; size: number; url: string }> {
+  const base64 = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Failed to read selected file'));
+    reader.readAsDataURL(file);
+  });
+
+  return apiFetch('/files/upload', {
+    method: 'POST',
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      purpose,
+      base64,
+    }),
+  });
+}
+

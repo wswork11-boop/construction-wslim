@@ -1,9 +1,17 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Put, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { z } from 'zod';
 import { PresignRequestSchema } from '@construction/shared';
 import { FilesService } from './files.service';
 import { AuthUser, CurrentUser, Public } from '../common/decorators';
 import { parseWithZod } from '../common/zod';
+
+const DirectUploadSchema = z.object({
+  fileName: z.string().trim().min(1).max(255),
+  mimeType: z.string().trim().min(1).max(100),
+  purpose: z.string().trim().min(1).max(60),
+  base64: z.string().min(1),
+});
 
 @ApiTags('Files')
 @ApiBearerAuth()
@@ -15,6 +23,12 @@ export class FilesController {
   async presign(@CurrentUser() user: AuthUser, @Body() body: unknown) {
     const dto = parseWithZod(PresignRequestSchema, body);
     return this.filesService.presign(user, dto);
+  }
+
+  @Post('upload')
+  async uploadDirect(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    const dto = parseWithZod(DirectUploadSchema, body);
+    return this.filesService.uploadDirect(user, dto);
   }
 
   @Get(':id/url')

@@ -17,6 +17,10 @@ const PURPOSE_RULES: Record<string, { allowedMime: string[]; maxSize: number }> 
     allowedMime: ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml'],
     maxSize: 5 * 1024 * 1024, // 5 MB
   },
+  EXPENSE_RECEIPT: {
+    allowedMime: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+    maxSize: 15 * 1024 * 1024, // 15 MB
+  },
   DOCUMENT_PDF: {
     allowedMime: ['application/pdf'],
     maxSize: 25 * 1024 * 1024, // 25 MB
@@ -156,8 +160,68 @@ export class FilesService {
     if (!file) {
       throw AppException.notFound('NOT_FOUND', 'File not found');
     }
-    const buffer = this.inMemoryBlobs.get(file.bucketKey) || Buffer.alloc(0);
-    return { buffer, mimeType: file.mimeType, fileName: file.fileName };
+    let buffer = this.inMemoryBlobs.get(file.bucketKey);
+    if (!buffer && this.useExternalS3) {
+      try {
+        const res = await this.s3.send(
+          new GetObjectCommand({
+            Bucket: this.bucket,
+            Key: file.bucketKey,
+          }),
+        );
+        if (res.Body) {
+          const byteArray = await res.Body.transformToByteArray();
+          buffer = Buffer.from(byteArray);
+          this.inMemoryBlobs.set(file.bucketKey, buffer);
+        }
+      } catch {
+        // fallback to empty buffer
+      }
+    }
+    return { buffer: buffer || Buffer.alloc(0), mimeType: file.mimeType, fileName: file.fileName };
+  }
+
+  async uploadDirect(
+    user: AuthUser,
+    dto: { fileName: string; mimeType: string; purpose: string; base64: string },
+  ) {
+    const rule = PURPOSE_RULES[dto.purpose] || {
+      allowedMime: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+      maxSize: 20 * 1024 * 1024,
+    };
+
+    if (!rule.allowedMime.includes(dto.mimeType)) {
+      throw AppException.unprocessable(
+        'FILE_TYPE_NOT_ALLOWED',
+        `mimeType ${dto.mimeType} is not allowed for ${dto.purpose}`,
+      );
+    }
+
+    const cleanBase64 = dto.base64.includes(',') ? dto.base64.split(',')[1] : dto.base64;
+    const buffer = Buffer.from(cleanBase64, 'base64');
+
+    if (buffer.byteLength > rule.maxSize) {
+      throw AppException.unprocessable(
+        'FILE_TOO_LARGE',
+        `File size exceeds limit of ${rule.maxSize} bytes for ${dto.purpose}`,
+      );
+    }
+
+    const file = await this.storeBuffer(buffer, {
+      fileName: dto.fileName,
+      mimeType: dto.mimeType,
+      purpose: dto.purpose,
+      uploadedById: user.id,
+    });
+
+    const dl = await this.getDownloadUrl(file.id);
+    return {
+      fileId: file.id,
+      fileName: file.fileName,
+      mimeType: file.mimeType,
+      size: file.size,
+      url: dl.url,
+    };
   }
 
   async verifyAndMarkReady(fileId: string, tx?: any) {

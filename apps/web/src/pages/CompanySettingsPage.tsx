@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Role } from '@construction/shared';
-import { apiFetch } from '../lib/api';
+import { apiFetch, apiUploadFile, getFileContentUrl } from '../lib/api';
 import { authStore } from '../lib/auth';
 
 export const CompanySettingsPage: React.FC = () => {
@@ -9,6 +9,7 @@ export const CompanySettingsPage: React.FC = () => {
 
   const [companies, setCompanies] = useState<any[]>([]);
   const [company, setCompany] = useState<any>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
   const [showNewCompany, setShowNewCompany] = useState(false);
   const [newCompCode, setNewCompCode] = useState('');
   const [newCompName, setNewCompName] = useState('');
@@ -67,6 +68,7 @@ export const CompanySettingsPage: React.FC = () => {
           address: company.address || null,
           phone: company.phone || null,
           email: company.email || null,
+          logoFileId: company.logoFileId || null,
           bankDetails: company.bankDetails || null,
           defaultPaymentTermDays: Number(company.defaultPaymentTermDays),
           defaultRetentionPercent: company.defaultRetentionPercent,
@@ -108,6 +110,29 @@ export const CompanySettingsPage: React.FC = () => {
       setMessage(`Added company "${created.name}".`);
     } catch (err: any) {
       setError(err.message);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !company) return;
+    setUploadingLogo(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const uploaded = await apiUploadFile(file, 'COMPANY_LOGO');
+      const updated = await apiFetch(`/companies/${company.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ logoFileId: uploaded.fileId }),
+      });
+      setCompany(updated);
+      await loadData(updated.id);
+      setMessage(`Uploaded and saved company logo for ${updated.name}.`);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setUploadingLogo(false);
+      e.target.value = '';
     }
   };
 
@@ -314,6 +339,49 @@ export const CompanySettingsPage: React.FC = () => {
               value={company.bankDetails || ''}
               onChange={(e) => setCompany({ ...company, bankDetails: e.target.value })}
             />
+          </div>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>Company Logo (stored in S3 / R2 bucket, printed on documents)</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6, flexWrap: 'wrap' }}>
+              {company.logoFileId ? (
+                <img
+                  src={getFileContentUrl(company.logoFileId)}
+                  alt={`${company.name} logo`}
+                  style={{
+                    height: 54,
+                    maxWidth: 160,
+                    objectFit: 'contain',
+                    border: '1px solid var(--line)',
+                    borderRadius: 6,
+                    padding: 4,
+                    background: '#fff',
+                  }}
+                />
+              ) : (
+                <div
+                  className="small muted"
+                  style={{
+                    padding: '12px 16px',
+                    border: '1px dashed var(--line)',
+                    borderRadius: 6,
+                    background: '#fafbfc',
+                  }}
+                >
+                  No logo uploaded yet
+                </div>
+              )}
+              {isOwner && (
+                <div>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/svg+xml"
+                    disabled={uploadingLogo}
+                    onChange={handleLogoUpload}
+                  />
+                  {uploadingLogo && <div className="small muted">Uploading to S3 bucket...</div>}
+                </div>
+              )}
+            </div>
           </div>
         </div>
         <div>

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ExpenseCategory, ExpenseStatus, Role } from '@construction/shared';
-import { apiDownload, apiFetch } from '../lib/api';
+import { apiDownload, apiFetch, apiUploadFile, getFileContentUrl } from '../lib/api';
 import { authStore } from '../lib/auth';
 import { activeProjectStore } from '../lib/active-project';
 
@@ -66,6 +66,8 @@ export const ExpensesPage: React.FC = () => {
   const [initialStatus, setInitialStatus] = useState<'PAID' | 'UNPAID' | 'REIMBURSED'>('PAID');
   const [paymentMethod, setPaymentMethod] = useState('BANK_TRANSFER');
   const [paymentReference, setPaymentReference] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [notes, setNotes] = useState('');
 
   const [error, setError] = useState<string | null>(null);
@@ -113,7 +115,14 @@ export const ExpensesPage: React.FC = () => {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setUploadingReceipt(true);
     try {
+      let receiptFileId: string | null = null;
+      if (receiptFile) {
+        const uploaded = await apiUploadFile(receiptFile, 'EXPENSE_RECEIPT');
+        receiptFileId = uploaded.fileId;
+      }
+
       await apiFetch('/expenses', {
         method: 'POST',
         body: JSON.stringify({
@@ -129,6 +138,7 @@ export const ExpensesPage: React.FC = () => {
           paidDate: initialStatus !== 'UNPAID' ? expenseDate : null,
           paymentMethod: initialStatus !== 'UNPAID' ? paymentMethod : null,
           paymentReference: initialStatus !== 'UNPAID' ? paymentReference || null : null,
+          receiptFileId,
           notes: notes || null,
         }),
       });
@@ -138,10 +148,13 @@ export const ExpensesPage: React.FC = () => {
       setDescription('');
       setAmount('100.00');
       setPaymentReference('');
+      setReceiptFile(null);
       setNotes('');
       await loadExpenses();
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setUploadingReceipt(false);
     }
   };
 
@@ -355,14 +368,25 @@ export const ExpensesPage: React.FC = () => {
                 </select>
               </div>
             )}
+            <div style={{ gridColumn: '1 / span 2' }}>
+              <label>Upload Receipt / Supplier Bill (Photo or PDF &rarr; stored in S3 bucket)</label>
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,application/pdf"
+                onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+              />
+              {receiptFile && (
+                <div className="small muted">Selected: {receiptFile.name}</div>
+              )}
+            </div>
             <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 12 }}>
               <span className="bold">Total with tax: RM {previewTotal}</span>
               <span className="sp" />
               <button type="button" className="btn" onClick={() => setShowCreate(false)}>
                 Cancel
               </button>
-              <button type="submit" className="btn pri">
-                Save Expense
+              <button type="submit" className="btn pri" disabled={uploadingReceipt}>
+                {uploadingReceipt ? 'Uploading receipt & saving...' : 'Save Expense'}
               </button>
             </div>
           </form>
@@ -451,6 +475,18 @@ export const ExpensesPage: React.FC = () => {
                   <div>{exp.description}</div>
                   {exp.billReference && (
                     <div className="small muted">Bill/Receipt: {exp.billReference}</div>
+                  )}
+                  {exp.receiptFileId && (
+                    <div style={{ marginTop: 4 }}>
+                      <a
+                        href={getFileContentUrl(exp.receiptFileId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="pill info"
+                      >
+                        View Uploaded Receipt &nearr;
+                      </a>
+                    </div>
                   )}
                 </td>
                 <td className="num bold">{exp.total}</td>
