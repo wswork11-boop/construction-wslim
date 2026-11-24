@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { z } from 'zod';
 import {
+  CompanyCreateSchema,
   CompanyUpdateSchema,
   PaginationQuerySchema,
   Role,
@@ -36,6 +37,29 @@ export class CompanyController {
   async updateCompany(@CurrentUser() user: AuthUser, @Body() body: unknown) {
     const dto = parseWithZod(CompanyUpdateSchema, body);
     return this.companyService.updateCompany(user, dto);
+  }
+
+  @Get('companies')
+  async listCompanies() {
+    return this.companyService.listCompanies();
+  }
+
+  @Post('companies')
+  @Roles(Role.OWNER)
+  async createCompany(@CurrentUser() user: AuthUser, @Body() body: unknown) {
+    const dto = parseWithZod(CompanyCreateSchema, body);
+    return this.companyService.createCompany(user, dto);
+  }
+
+  @Patch('companies/:id')
+  @Roles(Role.OWNER)
+  async updateCompanyById(
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const dto = parseWithZod(CompanyUpdateSchema, body);
+    return this.companyService.updateCompanyById(user, id, dto);
   }
 
   @Get('tax-rates')

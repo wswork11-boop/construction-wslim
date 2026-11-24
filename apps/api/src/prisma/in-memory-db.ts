@@ -243,11 +243,29 @@ export class InMemoryDatabase {
       if (include.client) {
         copy.client = this.clients.find((c) => c.id === row.clientId) || null;
       }
+      if (include.company) {
+        copy.company = row.companyId
+          ? this.companies.find((c) => c.id === row.companyId) || null
+          : null;
+      }
       if (include.members) {
         const mems = this.projectMembers.filter((m) => m.projectId === row.id);
         copy.members = mems.map((m) => ({
           ...m,
           user: this.users.find((u) => u.id === m.userId) || null,
+        }));
+      }
+    } else if (tableName === 'user') {
+      if (include.company) {
+        copy.company = row.companyId
+          ? this.companies.find((c) => c.id === row.companyId) || null
+          : null;
+      }
+      if (include.memberships) {
+        const mems = this.projectMembers.filter((m) => m.userId === row.id);
+        copy.memberships = mems.map((m) => ({
+          ...m,
+          project: this.projects.find((p) => p.id === m.projectId) || null,
         }));
       }
     } else if (tableName === 'projectMember') {
@@ -577,6 +595,8 @@ export class InMemoryDatabase {
           name: d.name,
           phone: d.phone ?? null,
           role: d.role,
+          companyId: d.companyId ?? null,
+          companyName: d.companyName ?? null,
           isActive: d.isActive ?? true,
           createdAt: d.createdAt ?? now(),
           updatedAt: d.updatedAt ?? now(),
@@ -618,7 +638,8 @@ export class InMemoryDatabase {
         (r) => (db.companies = r),
         (d) => ({
           id: d.id ?? uuidv7(),
-          singleton: true,
+          singleton: d.singleton !== undefined ? d.singleton : null,
+          code: d.code ?? null,
           name: d.name,
           registrationNo: d.registrationNo ?? null,
           tin: d.tin ?? null,
@@ -632,6 +653,8 @@ export class InMemoryDatabase {
           defaultPaymentTermDays: d.defaultPaymentTermDays ?? 30,
           defaultRetentionPercent: toDecimal(d.defaultRetentionPercent ?? 10),
           defaultRetentionCapPercent: toDecimal(d.defaultRetentionCapPercent ?? 5),
+          isDefault: d.isDefault ?? false,
+          isActive: d.isActive ?? true,
           createdAt: d.createdAt ?? now(),
           updatedAt: d.updatedAt ?? now(),
         }),
@@ -691,6 +714,7 @@ export class InMemoryDatabase {
           code: d.code,
           name: d.name,
           clientId: d.clientId,
+          companyId: d.companyId ?? null,
           contractQuotationId: d.contractQuotationId ?? null,
           contractQuoteRef: d.contractQuoteRef ?? null,
           poNumber: d.poNumber ?? null,

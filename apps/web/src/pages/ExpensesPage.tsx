@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { ExpenseCategory, ExpenseStatus, Role } from '@construction/shared';
 import { apiDownload, apiFetch } from '../lib/api';
 import { authStore } from '../lib/auth';
+import { activeProjectStore } from '../lib/active-project';
 
 const CATEGORY_LABELS: Record<string, string> = {
   MATERIALS: 'Materials & Hardware',
@@ -34,7 +35,9 @@ export const ExpensesPage: React.FC = () => {
 
   // Filters
   const [q, setQ] = useState('');
-  const [projectIdFilter, setProjectIdFilter] = useState(searchParams.get('projectId') || '');
+  const [projectIdFilter, setProjectIdFilter] = useState(
+    searchParams.get('projectId') || activeProjectStore.getProjectId(),
+  );
   const [categoryFilter, setCategoryFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [fromFilter, setFromFilter] = useState('');
@@ -42,7 +45,17 @@ export const ExpensesPage: React.FC = () => {
 
   // Create form
   const [showCreate, setShowCreate] = useState(false);
-  const [projectId, setProjectId] = useState(searchParams.get('projectId') || '');
+  const [projectId, setProjectId] = useState(
+    searchParams.get('projectId') || activeProjectStore.getProjectId(),
+  );
+
+  useEffect(() => {
+    return activeProjectStore.subscribe(() => {
+      const next = activeProjectStore.getProjectId();
+      setProjectIdFilter(next);
+      if (next) setProjectId(next);
+    });
+  }, []);
   const [category, setCategory] = useState<string>(ExpenseCategory.MATERIALS);
   const [expenseDate, setExpenseDate] = useState(today);
   const [vendorName, setVendorName] = useState('');

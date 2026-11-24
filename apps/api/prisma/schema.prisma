@@ -10,8 +10,7 @@
 //   - ClaimLine.cumulativePercent between 0 and 100 (CHECK)
 
 generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "debian-openssl-3.0.x"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -123,10 +122,13 @@ model User {
   name         String
   phone        String?
   role         Role
+  companyId    String?  @db.Uuid
+  companyName  String?
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  company       Company?        @relation(fields: [companyId], references: [id])
   refreshTokens RefreshToken[]
   memberships   ProjectMember[]
   files         File[]
@@ -170,10 +172,11 @@ model LoginAttempt {
   @@index([email, createdAt])
 }
 
-// Single row. `singleton` is always true and unique, so a second row cannot exist.
+// Primary company has `singleton = true`; additional sister companies have `singleton = null`.
 model Company {
   id                         String   @id @default(uuid(7)) @db.Uuid
-  singleton                  Boolean  @unique @default(true)
+  singleton                  Boolean? @unique
+  code                       String?
   name                       String
   registrationNo             String?
   tin                        String?
@@ -187,8 +190,13 @@ model Company {
   defaultPaymentTermDays     Int      @default(30)
   defaultRetentionPercent    Decimal  @default(10) @db.Decimal(5, 2)
   defaultRetentionCapPercent Decimal  @default(5) @db.Decimal(5, 2)
+  isDefault                  Boolean  @default(false)
+  isActive                   Boolean  @default(true)
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
+
+  projects Project[]
+  users    User[]
 }
 
 model TaxRate {
@@ -242,6 +250,7 @@ model Project {
   code                   String        @unique
   name                   String
   clientId               String        @db.Uuid
+  companyId              String?       @db.Uuid
   contractQuotationId    String?       @db.Uuid
   contractQuoteRef       String?
   poNumber               String?
@@ -257,6 +266,7 @@ model Project {
   updatedAt              DateTime      @updatedAt
 
   client  Client          @relation(fields: [clientId], references: [id])
+  company Company?        @relation(fields: [companyId], references: [id])
   members ProjectMember[]
 
   quotations        Quotation[]

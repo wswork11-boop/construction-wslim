@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import {
+  CompanyCreate,
   CompanyUpdate,
   formatPercent,
   PaginationQuery,
@@ -22,6 +23,7 @@ export class CompanyService {
   serializeCompany(company: any) {
     return {
       id: company.id,
+      code: company.code ?? null,
       name: company.name,
       registrationNo: company.registrationNo ?? null,
       tin: company.tin ?? null,
@@ -35,6 +37,8 @@ export class CompanyService {
       defaultPaymentTermDays: company.defaultPaymentTermDays,
       defaultRetentionPercent: formatPercent(company.defaultRetentionPercent),
       defaultRetentionCapPercent: formatPercent(company.defaultRetentionCapPercent),
+      isDefault: Boolean(company.isDefault || company.singleton),
+      isActive: company.isActive ?? true,
       createdAt:
         company.createdAt instanceof Date ? company.createdAt.toISOString() : company.createdAt,
       updatedAt:
@@ -55,11 +59,21 @@ export class CompanyService {
   }
 
   async getCompany() {
-    let company = await this.prisma.company.findUnique({ where: { singleton: true } });
+    let company = await this.prisma.company.findFirst({
+      where: { isDefault: true },
+    });
+    if (!company) {
+      company = await this.prisma.company.findUnique({ where: { singleton: true } });
+    }
+    if (!company) {
+      company = await this.prisma.company.findFirst();
+    }
     if (!company) {
       company = await this.prisma.company.create({
         data: {
           singleton: true,
+          isDefault: true,
+          isActive: true,
           name: 'Contoh Bina Sdn Bhd',
           defaultPaymentTermDays: 30,
           defaultRetentionPercent: 10,
@@ -70,8 +84,78 @@ export class CompanyService {
     return this.serializeCompany(company);
   }
 
-  async updateCompany(user: AuthUser, dto: CompanyUpdate) {
-    const existing = await this.getCompany();
+  async getCompanyById(id?: string | null) {
+    if (!id) {
+      return this.getCompany();
+    }
+    const found = await this.prisma.company.findUnique({ where: { id } });
+    if (!found) {
+      return this.getCompany();
+    }
+    return this.serializeCompany(found);
+  }
+
+  async listCompanies() {
+    await this.getCompany();
+    const items = await this.prisma.company.findMany({
+      orderBy: { createdAt: 'asc' },
+    });
+    return {
+      items: items.map((c: any) => this.serializeCompany(c)),
+      total: items.length,
+    };
+  }
+
+  async createCompany(user: AuthUser, dto: CompanyCreate) {
+    return this.prisma.$transaction(async (tx: any) => {
+      if (dto.isDefault) {
+        await tx.company.updateMany({
+          where: { isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+      const created = await tx.company.create({
+        data: {
+          singleton: null,
+          code: dto.code?.trim().toUpperCase() || null,
+          name: dto.name.trim(),
+          registrationNo: dto.registrationNo ?? null,
+          tin: dto.tin ?? null,
+          sstNo: dto.sstNo ?? null,
+          msicCode: dto.msicCode ?? null,
+          address: dto.address ?? null,
+          phone: dto.phone ?? null,
+          email: dto.email ?? null,
+          logoFileId: dto.logoFileId ?? null,
+          bankDetails: dto.bankDetails ?? null,
+          defaultPaymentTermDays: dto.defaultPaymentTermDays ?? 30,
+          defaultRetentionPercent: dto.defaultRetentionPercent ?? '10.00',
+          defaultRetentionCapPercent: dto.defaultRetentionCapPercent ?? '5.00',
+          isDefault: dto.isDefault ?? false,
+          isActive: true,
+        },
+      });
+      const serialized = this.serializeCompany(created);
+      await this.auditService.log(
+        {
+          userId: user.id,
+          entity: 'Company',
+          entityId: created.id,
+          action: 'CREATE',
+          after: serialized,
+        },
+        tx,
+      );
+      return serialized;
+    });
+  }
+
+  async updateCompanyById(user: AuthUser, id: string, dto: CompanyUpdate) {
+    const existingRow = await this.prisma.company.findUnique({ where: { id } });
+    if (!existingRow) {
+      throw AppException.notFound('NOT_FOUND', 'Company not found');
+    }
+    const existing = this.serializeCompany(existingRow);
 
     if (dto.logoFileId) {
       const file = await this.prisma.file.findUnique({ where: { id: dto.logoFileId } });
@@ -89,9 +173,17 @@ export class CompanyService {
       }
     }
 
+    if (dto.isDefault) {
+      await this.prisma.company.updateMany({
+        where: { isDefault: true },
+        data: { isDefault: false },
+      });
+    }
+
     const updated = await this.prisma.company.update({
-      where: { singleton: true },
+      where: { id },
       data: {
+        ...(dto.code !== undefined ? { code: dto.code?.trim().toUpperCase() || null } : {}),
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.registrationNo !== undefined ? { registrationNo: dto.registrationNo } : {}),
         ...(dto.tin !== undefined ? { tin: dto.tin } : {}),
@@ -111,6 +203,8 @@ export class CompanyService {
         ...(dto.defaultRetentionCapPercent !== undefined
           ? { defaultRetentionCapPercent: dto.defaultRetentionCapPercent }
           : {}),
+        ...(dto.isDefault !== undefined ? { isDefault: dto.isDefault } : {}),
+        ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
       },
     });
 
@@ -124,6 +218,11 @@ export class CompanyService {
       after: serialized,
     });
     return serialized;
+  }
+
+  async updateCompany(user: AuthUser, dto: CompanyUpdate) {
+    const existing = await this.getCompany();
+    return this.updateCompanyById(user, existing.id, dto);
   }
 
   async listTaxRates(query: PaginationQuery & { isActive?: boolean }) {

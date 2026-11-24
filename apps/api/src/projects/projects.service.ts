@@ -47,6 +47,16 @@ export class ProjectsService {
       code: project.code,
       name: project.name,
       clientId: project.clientId,
+      companyId: project.companyId ?? null,
+      ...(project.company
+        ? {
+            company: {
+              id: project.company.id,
+              code: project.company.code ?? null,
+              name: project.company.name,
+            },
+          }
+        : {}),
       ...(project.client
         ? {
             client: {
@@ -93,7 +103,7 @@ export class ProjectsService {
 
   async list(
     user: AuthUser,
-    query: PaginationQuery & { status?: ProjectStatus; clientId?: string },
+    query: PaginationQuery & { status?: ProjectStatus; clientId?: string; companyId?: string },
   ) {
     const where: any = {};
     if (query.status) {
@@ -101,6 +111,9 @@ export class ProjectsService {
     }
     if (query.clientId) {
       where.clientId = query.clientId;
+    }
+    if (query.companyId) {
+      where.companyId = query.companyId;
     }
     if (query.q) {
       where.OR = [
@@ -125,7 +138,7 @@ export class ProjectsService {
         orderBy,
         skip,
         take: query.pageSize,
-        include: { client: true },
+        include: { client: true, company: true },
       }),
       this.prisma.project.count({ where }),
     ]);
@@ -141,7 +154,7 @@ export class ProjectsService {
   async getById(user: AuthUser, id: string) {
     const project = await this.prisma.project.findUnique({
       where: { id },
-      include: { client: true, members: { include: { user: true } } },
+      include: { client: true, company: true, members: { include: { user: true } } },
     });
     if (!project) {
       throw AppException.notFound('NOT_FOUND', 'Project not found');
@@ -165,7 +178,7 @@ export class ProjectsService {
       );
     }
 
-    const company = await this.companyService.getCompany();
+    const company = await this.companyService.getCompanyById(dto.companyId);
 
     return this.prisma.$transaction(async (tx: any) => {
       const created = await tx.project.create({
@@ -173,6 +186,7 @@ export class ProjectsService {
           code,
           name: dto.name.trim(),
           clientId: dto.clientId,
+          companyId: dto.companyId ?? company.id,
           poNumber: dto.poNumber ?? null,
           siteAddress: dto.siteAddress ?? null,
           status: dto.status ?? 'DRAFT',
@@ -183,7 +197,7 @@ export class ProjectsService {
           retentionCapPercent: dto.retentionCapPercent ?? company.defaultRetentionCapPercent,
           defectsLiabilityMonths: dto.defectsLiabilityMonths ?? 12,
         },
-        include: { client: true, members: { include: { user: true } } },
+        include: { client: true, company: true, members: { include: { user: true } } },
       });
 
       const serialized = this.serializeProject(created, user.role, true);
@@ -230,6 +244,7 @@ export class ProjectsService {
         data: {
           ...(code !== undefined ? { code } : {}),
           ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+          ...(dto.companyId !== undefined ? { companyId: dto.companyId } : {}),
           ...(dto.poNumber !== undefined ? { poNumber: dto.poNumber } : {}),
           ...(dto.siteAddress !== undefined ? { siteAddress: dto.siteAddress } : {}),
           ...(dto.status !== undefined ? { status: dto.status } : {}),
@@ -249,7 +264,7 @@ export class ProjectsService {
             ? { defectsLiabilityMonths: dto.defectsLiabilityMonths }
             : {}),
         },
-        include: { client: true, members: { include: { user: true } } },
+        include: { client: true, company: true, members: { include: { user: true } } },
       });
 
       const serialized = this.serializeProject(updated, user.role, true);

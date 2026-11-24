@@ -39,6 +39,7 @@ in Requirements before Design, and Design before Tasks.
 | [specs/05-reports/spec.md](specs/05-reports/spec.md) | Dashboard and reports |
 | [specs/06-myinvois/spec.md](specs/06-myinvois/spec.md) | LHDN e-invoice |
 | [specs/07-expenses/spec.md](specs/07-expenses/spec.md) | Project & company expenses (job costing) |
+| [specs/08-multi-company-and-project-assignment/spec.md](specs/08-multi-company-and-project-assignment/spec.md) | Multi-company profiles, user project assignment & active project selector |
 
 ## Design files
 
@@ -69,6 +70,7 @@ examples only.
 | 05 Reports | Done |
 | 06 MyInvois | Draft - LHDN rules to be verified |
 | 07 Expenses | Done |
+| 08 Multi-Company & Project Assignment | Done |
 
 ## Next step
 

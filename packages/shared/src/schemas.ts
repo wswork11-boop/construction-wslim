@@ -66,6 +66,9 @@ export const UserCreateSchema = z.object({
   phone: z.string().max(30).nullable().optional(),
   role: RoleSchema,
   password: z.string().min(8),
+  companyId: z.string().uuid().nullable().optional(),
+  companyName: z.string().max(200).nullable().optional(),
+  projectIds: z.array(z.string().uuid()).optional(),
 });
 export type UserCreate = z.infer<typeof UserCreateSchema>;
 
@@ -77,6 +80,9 @@ export const UserUpdateSchema = z
     role: RoleSchema.optional(),
     isActive: z.boolean().optional(),
     password: z.string().min(8).optional(),
+    companyId: z.string().uuid().nullable().optional(),
+    companyName: z.string().max(200).nullable().optional(),
+    projectIds: z.array(z.string().uuid()).optional(),
   })
   .refine((obj) => Object.keys(obj).length > 0, {
     message: 'At least one field must be provided',
@@ -97,8 +103,28 @@ export type UserListQuery = z.infer<typeof UserListQuerySchema>;
 // Company & Tax Rates
 // ---------------------------------------------------------------------------
 
+export const CompanyCreateSchema = z.object({
+  code: z.string().max(20).nullable().optional(),
+  name: z.string().min(1).max(200),
+  registrationNo: z.string().nullable().optional(),
+  tin: z.string().nullable().optional(),
+  sstNo: z.string().nullable().optional(),
+  msicCode: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  phone: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  logoFileId: z.string().uuid().nullable().optional(),
+  bankDetails: z.string().nullable().optional(),
+  defaultPaymentTermDays: z.number().int().min(0).default(30),
+  defaultRetentionPercent: PercentSchema.optional(),
+  defaultRetentionCapPercent: PercentSchema.optional(),
+  isDefault: z.boolean().optional(),
+});
+export type CompanyCreate = z.infer<typeof CompanyCreateSchema>;
+
 export const CompanyUpdateSchema = z
   .object({
+    code: z.string().max(20).nullable().optional(),
     name: z.string().min(1).optional(),
     registrationNo: z.string().nullable().optional(),
     tin: z.string().nullable().optional(),
@@ -112,6 +138,8 @@ export const CompanyUpdateSchema = z
     defaultPaymentTermDays: z.number().int().min(0).optional(),
     defaultRetentionPercent: PercentSchema.optional(),
     defaultRetentionCapPercent: PercentSchema.optional(),
+    isDefault: z.boolean().optional(),
+    isActive: z.boolean().optional(),
   })
   .refine((obj) => Object.keys(obj).length > 0, {
     message: 'At least one field must be provided',
@@ -189,6 +217,7 @@ export const ProjectCreateSchema = z.object({
   code: z.string().min(1).max(30),
   name: z.string().min(1).max(200),
   clientId: z.string().uuid(),
+  companyId: z.string().uuid().nullable().optional(),
   poNumber: z.string().max(100).nullable().optional(),
   siteAddress: z.string().nullable().optional(),
   status: ProjectStatusSchema.default('DRAFT'),
@@ -204,6 +233,7 @@ export const ProjectUpdateSchema = z
   .object({
     code: z.string().min(1).max(30).optional(),
     name: z.string().min(1).max(200).optional(),
+    companyId: z.string().uuid().nullable().optional(),
     poNumber: z.string().max(100).nullable().optional(),
     siteAddress: z.string().nullable().optional(),
     status: ProjectStatusSchema.optional(),
@@ -228,6 +258,7 @@ export type ProjectMembersInput = z.infer<typeof ProjectMembersInputSchema>;
 export const ProjectListQuerySchema = PaginationQuerySchema.extend({
   status: ProjectStatusSchema.optional(),
   clientId: z.string().uuid().optional(),
+  companyId: z.string().uuid().optional(),
 });
 
 // ---------------------------------------------------------------------------

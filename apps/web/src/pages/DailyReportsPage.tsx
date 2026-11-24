@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Role } from '@construction/shared';
 import { apiFetch } from '../lib/api';
 import { authStore } from '../lib/auth';
+import { activeProjectStore } from '../lib/active-project';
 
 export const DailyReportsPage: React.FC = () => {
   const { user } = authStore.getState();
@@ -11,16 +12,26 @@ export const DailyReportsPage: React.FC = () => {
     user?.role === Role.PROJECT_MANAGER;
 
   const [projects, setProjects] = useState<any[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [selectedProjectId, setSelectedProjectId] = useState(activeProjectStore.getProjectId());
   const [reports, setReports] = useState<any[]>([]);
   const [selectedReport, setSelectedReport] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    return activeProjectStore.subscribe(() => {
+      const next = activeProjectStore.getProjectId();
+      if (next) setSelectedProjectId(next);
+    });
+  }, []);
+
+  useEffect(() => {
     apiFetch('/projects?pageSize=100').then((res) => {
       const list = res.items || [];
       setProjects(list);
-      if (list[0]) {
+      const activeId = activeProjectStore.getProjectId();
+      if (activeId && list.some((p: any) => p.id === activeId)) {
+        setSelectedProjectId(activeId);
+      } else if (list[0]) {
         setSelectedProjectId(list[0].id);
       }
     });

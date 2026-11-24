@@ -1199,11 +1199,11 @@ export class InvoicesService {
       }
     }
 
-    const company = await this.companyService.getCompany();
     const client = await this.prisma.client.findUnique({ where: { id: inv.clientId } });
     const project = inv.projectId
       ? await this.prisma.project.findUnique({ where: { id: inv.projectId } })
       : null;
+    const company = await this.companyService.getCompanyById(project?.companyId);
 
     const issueDateYmd = inv.issueDate || getKlTodayString();
     const dueDateYmd = addDaysToYmd(issueDateYmd, company.defaultPaymentTermDays);
@@ -1347,11 +1347,11 @@ export class InvoicesService {
       return this.filesService.getDownloadUrl(inv.pdfFileId);
     }
 
-    const company = await this.companyService.getCompany();
     const client = await this.prisma.client.findUnique({ where: { id: inv.clientId } });
     const project = inv.projectId
       ? await this.prisma.project.findUnique({ where: { id: inv.projectId } })
       : null;
+    const company = await this.companyService.getCompanyById(project?.companyId);
 
     const html = this.pdfService.renderInvoiceHtml({
       company,
